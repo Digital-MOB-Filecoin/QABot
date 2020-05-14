@@ -1,0 +1,15 @@
+{
+  "name": "qabot",
+  "version": "1.0.0",
+  "description": "QA Bot",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andreea Stefan, George Robert Stefan",
+  "license": "ISC",
+  "dependencies": {
+    "csv-writer": "^1.6.0",
+    "unique-filename": "^1.1.1"
+  }
+}
