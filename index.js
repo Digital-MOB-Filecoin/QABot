@@ -56,7 +56,14 @@ function GetTopMiners() {
       minersList.forEach(item => {
         console.log("miner:" + item.miner);
         const cspr_itm = childProcess.spawnSync('lotus', ['state', 'power', item.miner], { encoding: 'utf-8' })
+
+        var resultString = cspr_itm.stdout;
+
+        var pos = resultString.indexOf("(");
+        resultString.substring(0, pos+1);
+        
         console.log(cspr_itm.stdout);
+        console.log(resultString.substring(0, pos+1));
       });
     }
   });
