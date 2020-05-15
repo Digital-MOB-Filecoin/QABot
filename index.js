@@ -34,6 +34,36 @@ function INFO(msg) {
     console.log('\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
   }
 
+function GetTopMiners() {
+  const childProcess = require('child_process');
+  const readline = require('readline');
+  let minersList = new Array;
+
+  //lotus state list-miners
+  const cspr = childProcess.spawn('lotus', ['state', 'list-miners']);
+
+  const rl = readline.createInterface({ input: cspr.stdout });
+  rl.on('line', line => {
+    minersList.push({
+      miner: line,
+      power: 0
+    })
+  })
+
+  cspr.on('close', (code) => {
+    if (code === 0) {
+      console.log(`child process exited with code ${code}`);
+      minersList.forEach(item => {
+        console.log("miner:" + item.miner);
+        const cspr_itm = childProcess.spawnSync('lotus', ['state', 'power', item.miner], { encoding: 'utf-8' })
+        console.log(cspr_itm.stdout);
+      });
+    }
+  });
+
+
+}
+
 function GenerateTestFile(path, size) {
   const fd = fs.openSync(path, 'w')
   const hash = crypto.createHash('sha256')
@@ -102,9 +132,9 @@ function readyToRetrieve(item) {
     return false;
 }
 
-//new session
+GetTopMiners();
 
-mainLoop:while (true){
+mainLoop:while (false){
 //1. Generate random test files (100MB, 1GB, 5GB) and import them
 var testFileName = uniqueFilename('./test', 'qab-testfile');
 var testFileHash = GenerateTestFile(testFileName, FILE_SIZE_LARGE);
