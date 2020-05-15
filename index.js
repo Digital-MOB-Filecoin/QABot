@@ -12,10 +12,11 @@ const csvWriter = createCsvWriter({
 
 var uniqueFilename = require('unique-filename')
 let retrievingDataArray = new Array;
+let topMinersList = new Array;
 
 const RETRIVING_ARRAY_MAX_SIZE = 1000000 //items
 const BUFFER_SIZE = 65536 //64KB
-//const MIN_MINER_POWER = 790273982464(736 GiB) //ex
+const MIN_MINER_POWER = 1 //790273982464(736 GiB) //ex
 const FILE_SIZE_SMALL  = 104857600   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE  = 5368709120  // (5GB)
@@ -45,14 +46,15 @@ function GetTopMiners() {
   const rl = readline.createInterface({ input: cspr.stdout });
   rl.on('line', line => {
     minersList.push({
-      miner: line,
-      power: 0
+      miner: line
     })
   })
 
   cspr.on('close', (code) => {
     if (code === 0) {
       console.log(`child process exited with code ${code}`);
+
+      let i = 0;
       minersList.forEach(item => {
         console.log("miner:" + item.miner);
         const cspr_itm = childProcess.spawnSync('lotus', ['state', 'power', item.miner], { encoding: 'utf-8' })
@@ -60,10 +62,21 @@ function GetTopMiners() {
         var resultString = cspr_itm.stdout;
 
         var pos = resultString.indexOf("(");
-        resultString.substring(0, pos+1);
-        
-        console.log(cspr_itm.stdout);
-        console.log(resultString.substring(0, pos+1));
+        resultString.substring(0, pos);
+
+        var power = parseInt(resultString, 10);
+
+        if (power > MIN_MINER_POWER) {
+          topMinersList.push({
+            miner: item.miner,
+            power: power
+          })
+        }
+
+        i = i + 1;
+
+        console.log(i + "/" + minersList.length);
+        console.log(item.miner + ":" + resultString.substring(0, pos));
       });
     }
   });
