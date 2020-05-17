@@ -11,6 +11,7 @@ const csvWriter = createCsvWriter({
 });
 
 var uniqueFilename = require('unique-filename')
+const lotus = require('./lotus');
 let retrievingDataArray = new Array;
 let topMinersList = new Array;
 
@@ -37,52 +38,37 @@ function INFO(msg) {
 
 function GetTopMiners() {
   const childProcess = require('child_process');
-  const readline = require('readline');
-  let minersList = new Array;
 
   //lotus state list-miners
-  const cspr = childProcess.spawn('lotus', ['state', 'list-miners']);
-
-  const rl = readline.createInterface({ input: cspr.stdout });
-  rl.on('line', line => {
-    minersList.push({
-      miner: line
-    })
-  })
-
-  cspr.on('close', (code) => {
-    if (code === 0) {
-      console.log(`child process exited with code ${code}`);
-
-      let i = 0;
-      minersList.forEach(item => {
-        console.log("miner:" + item.miner);
-        const cspr_itm = childProcess.spawnSync('lotus', ['state', 'power', item.miner], { encoding: 'utf-8' })
-
-        var resultString = cspr_itm.stdout;
-
-        var pos = resultString.indexOf("(");
-        resultString.substring(0, pos);
-
-        var power = parseInt(resultString, 10);
-
-        if (power > MIN_MINER_POWER) {
-          topMinersList.push({
-            miner: item.miner,
-            power: power
-          })
-        }
-
-        i = i + 1;
-
-        console.log(i + "/" + minersList.length);
-        console.log(item.miner + ":" + resultString.substring(0, pos));
+  lotus.StateListMiners().then(json => {
+    json.result.reduce((previousPromise, miner) => {
+      return previousPromise.then(() => {
+        return lotus.StateMinerPower(miner).then(data => {
+          INFO(miner);
+          console.log(data);
+        }).catch(error => {
+          ERROR(error);
+        });
       });
-    }
-  });
+    }, Promise.resolve());
 
+  }).catch(error => {
+    ERROR(error);
+  });
+}
+
+function StorageDeal() {
+  //lotus client query-ask t044688
+  //lotus client deal QmPgU56srbA36kzQQP4oQDVASkL4nTYjnf23kosZ2jaN79 t044688 0.0000000005 3840 
+  //   returns: bafyreigurzq3gsodgwukadzqfn6fay7bfwz3gimzxuyzn6j4lmeumeupyu
+  // lotus client list-deals
 
 }
+
+function RetrievalDeal()  {
+  
+}
+
 
 function GenerateTestFile(path, size) {
   const fd = fs.openSync(path, 'w')
