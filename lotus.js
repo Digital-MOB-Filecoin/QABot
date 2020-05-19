@@ -1,6 +1,7 @@
 'use strict';
 
 const request = require('request');
+var spawn = require("spawn-promise");
 
 let baseUrl = "http://204.48.29.217:1234/rpc/v0";
 let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.gYTvmJn6A2TpLgnRTJptetz4L3-HO54XZbDLWB0JzIQ";
@@ -46,8 +47,30 @@ function StateMinerPower(miner) {
     return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.StateMinerPower", "params": [miner, null], "id": 3 }));
 }
 
+function StateMinerInfo(miner) {
+    return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.StateMinerInfo", "params": [miner, null], "id": 0 }));
+}
+
+function ClientQueryAsk(peerID, miner) {
+    return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientQueryAsk", "params": [peerID, miner, null], "id": 0 }));
+}
+
+function ClientStartDeal(dataCid, miner, price, duration) {
+    return spawn('lotus', ["client", "deal", dataCid, miner, price, duration], null);
+}
+
+function ClientImport(file) {
+    return spawn('lotus', ["client", "import", file], null);
+}
+
 var args = process.argv.slice(2);
 if (args[0] === 'test') {
+
+    ClientStartDeal("dataCid", "miner", "price", "duration").then(data => {
+        console.log(data)
+    }).catch(error => {
+        console.log(error);
+    });
 
     StateListMiners().then(data => {
         console.log(data)
@@ -65,4 +88,8 @@ if (args[0] === 'test') {
 module.exports = {
     StateListMiners,
     StateMinerPower,
+    StateMinerInfo,
+    ClientQueryAsk,
+    ClientStartDeal,
+    ClientImport,
 };
