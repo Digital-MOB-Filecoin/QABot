@@ -110,10 +110,10 @@ function LoadTopMiners() {
     .on('data', (data) => results.push(data))
     .on('end', () => {
       results.forEach(miner => {
-        INFO("LoadTopMiners : [" + miner.address + "," + miner.power + "]");
+        INFO("LoadTopMiners : [" + miner.ADDRESS + "," + miner.POWER + "]");
         topMinersList.push({
-          address: miner.address,
-          power: miner.power
+          address: miner.ADDRESS,
+          power: miner.POWER
         })
       });
     });
@@ -142,10 +142,9 @@ function StorageDeal(miner) {
                 ERROR(error);
               });
           }).catch(error => {
-            console.log(error);
+            ERROR(error);
           });
         }
-      }
       }).catch(error => {
         ERROR(error);
       });
@@ -215,7 +214,7 @@ function readyToRetrieve(item) {
 //GetTopMiners();
 LoadTopMiners();
 
-mainLoop: while (false) {
+mainLoop: while (true) {
 
 
   topMinersList.forEach(miner => {
@@ -225,7 +224,7 @@ mainLoop: while (false) {
 
 
   //Storing Data
-  if (retrievingDataArray.length < RETRIVING_ARRAY_MAX_SIZE) {
+  /*if (retrievingDataArray.length < RETRIVING_ARRAY_MAX_SIZE) {
 
     retrievingDataArray.push({
       filename: testFileName,
