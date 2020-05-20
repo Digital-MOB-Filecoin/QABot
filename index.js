@@ -27,7 +27,7 @@ function WARNING(msg) {
 }
 
 function RandomTestFileName() {
-  return uniqueFilename('./', 'qab-testfile');
+  return "~/" + uniqueFilename('./', 'qab-testfile');
 }
 
 function RandomTestFileSize() {
@@ -116,7 +116,7 @@ function LoadTopMiners() {
     const results = [];
     topMinersList = [];
 
-    fs.createReadStream('qabminers.csv')
+    fs.createReadStream('qabminers1.csv')
       .pipe(csv())
       .on('data', (data) => results.push(data))
       .on('end', () => {
