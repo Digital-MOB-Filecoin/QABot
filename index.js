@@ -62,6 +62,15 @@ function GenerateTestFile(filename) {
   return testFileHash;
 }
 
+function DeleteTestFile(filename) {
+  try {
+    fs.unlinkSync(filename);
+    INFO("DeleteTestFile : " + filename);
+  } catch(err) {
+    ERROR(err)
+  }
+}
+
 function GetTopMiners() {
   const createCsvWriter = require('csv-writer').createObjectCsvWriter;
   const csvMiners = createCsvWriter({
@@ -101,57 +110,75 @@ function GetTopMiners() {
 }
 
 function LoadTopMiners() {
-  const csv = require('csv-parser')
-  const fs = require('fs')
-  const results = [];
+  return new Promise(function (resolve, reject) {
+    const csv = require('csv-parser')
+    const fs = require('fs')
+    const results = [];
+    topMinersList = [];
 
-  fs.createReadStream('qabminers.csv')
-    .pipe(csv())
-    .on('data', (data) => results.push(data))
-    .on('end', () => {
-      results.forEach(miner => {
-        INFO("LoadTopMiners : [" + miner.ADDRESS + "," + miner.POWER + "]");
-        topMinersList.push({
-          address: miner.ADDRESS,
-          power: miner.POWER
-        })
+    fs.createReadStream('qabminers.csv')
+      .pipe(csv())
+      .on('data', (data) => results.push(data))
+      .on('end', () => {
+        results.forEach(miner => {
+          topMinersList.push({
+            address: miner.ADDRESS,
+            power: miner.POWER
+          })
+        });
+
+        INFO("topMinersList: " + topMinersList.length);
+        resolve(true);
       });
-    });
+  })
 }
 
 function StorageDeal(miner) {
-  lotus.StateMinerInfo(miner).then(data => {
-    INFO(data);
-    if (data.result.PeerId) {
-      lotus.ClientQueryAsk(data.result.PeerId, miner).then(data => {
-        INFO(data);
-        if (data.result.Ask.Price) {
-          //generate new file
-          var fileName = RandomTestFileName();
-          var testFileHash = GenerateTestFile(fileName);
+  return new Promise(function (resolve, reject) {
 
-          lotus.ClientImport(fileName).then(dataCid => {
-            INFO(dataCid);
+    INFO("StorageDeal [" + miner + "]");
+    lotus.StateMinerInfo(miner).then(data => {
+      INFO("StateMinerInfo [" + miner + "] PeerId: " + data.result.PeerId);
+      if (data.result.PeerId) {
+        lotus.ClientQueryAsk(data.result.PeerId, miner).then(data => {
+          if (data.error) {
+            ERROR("ClientQueryAsk : " + JSON.stringify(data));
+            resolve(false);
+          } else if (data.result && data.result.Ask && data.result.Ask.Price) {
+            INFO("ClientQueryAsk : " + JSON.stringify(data));
+            //generate new file
+            var fileName = RandomTestFileName();
+            var testFileHash = GenerateTestFile(fileName);
 
-            lotus.ClientStartDeal("bafkreih7ojhsmt6lzljynwrvyo5gggi2wwxa75fdo3fztpiixbtcagbxmi",
-              miner, data.result.Ask.Price, 10).then(data => {
-                INFO(data);
-                //data -> dealID bafyreigurzq3gsodgwukadzqfn6fay7bfwz3gimzxuyzn6j4lmeumeupyu
-                //TODO add dealID to pending deales list to track state
-              }).catch(error => {
-                ERROR(error);
-              });
-          }).catch(error => {
-            ERROR(error);
-          });
-        }
-      }).catch(error => {
-        ERROR(error);
-      });
-}
-  }).catch (error => {
-  ERROR(error);
-});
+            lotus.ClientImport(fileName).then(dataCid => {
+              INFO("ClientImport : " + dataCid);
+              DeleteTestFile(fileName);
+
+              lotus.ClientStartDeal("bafkreih7ojhsmt6lzljynwrvyo5gggi2wwxa75fdo3fztpiixbtcagbxmi",
+                miner, data.result.Ask.Price, 10).then(data => {
+                  INFO("ClientStartDeal: " + data);
+                  //data -> dealID bafyreigurzq3gsodgwukadzqfn6fay7bfwz3gimzxuyzn6j4lmeumeupyu
+                  //TODO add dealID to pending deales list to track state
+                  resolve(true);
+                }).catch(error => {
+                  ERROR(error);
+                  resolve(false);
+                });
+            }).catch(error => {
+              ERROR(error);
+              resolve(false);
+            });
+          }
+        }).catch(error => {
+          ERROR(error);
+          resolve(false);
+        });
+      }
+    }).catch(error => {
+      ERROR(error);
+      resolve(false);
+    });
+})
 
   //lotus client deal QmPgU56srbA36kzQQP4oQDVASkL4nTYjnf23kosZ2jaN79 t044688 0.0000000005 3840 
   //   returns: bafyreigurzq3gsodgwukadzqfn6fay7bfwz3gimzxuyzn6j4lmeumeupyu [59]
@@ -211,16 +238,27 @@ function readyToRetrieve(item) {
   return false;
 }
 
+async function RunStorageDeals() {
+  var it = 0;
+  while (it < topMinersList.length) {
+    await StorageDeal(topMinersList[it].address);
+    it++;
+  }
+}
+
 //GetTopMiners();
-LoadTopMiners();
+//LoadTopMiners();
 
-mainLoop: while (true) {
+(async () => {
+  //await LoadTopMiners();
+  //await RunStorageDeals();
+})();
 
+//LoadTopMiners().then(() => RunStorageDeals());
 
-  topMinersList.forEach(miner => {
-    StorageDeal(miner.address);
-
-  });
+LoadTopMiners().then(
+  () => RunStorageDeals().then(
+    () => {}));
 
 
   //Storing Data
@@ -253,8 +291,6 @@ mainLoop: while (true) {
     //})
   }*/
 
-}
-
 
 function shutdown() {
   INFO(`Shutdown`);
@@ -264,5 +300,3 @@ function shutdown() {
 process.on('SIGTERM', shutdown);
 // listen for INT signal e.g. Ctrl-C
 process.on('SIGINT', shutdown);
-
-//map max number of entries 2^24 -> 16777215

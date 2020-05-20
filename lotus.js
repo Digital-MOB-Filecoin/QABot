@@ -52,7 +52,7 @@ function StateMinerInfo(miner) {
 }
 
 function ClientQueryAsk(peerID, miner) {
-    return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientQueryAsk", "params": [peerID, miner, null], "id": 0 }));
+    return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientQueryAsk", "params": [peerID, miner], "id": 0 }));
 }
 
 function ClientStartDeal(dataCid, miner, price, duration) {
