@@ -19,7 +19,7 @@ function INFO(msg) {
 }
 
 function ERROR(msg) {
-  console.log('\x1b[31m', '[ ERR ] ', '\x1b[0m', msg);
+  console.log('\x1b[31m', '[ ERR  ] ', '\x1b[0m', msg);
 }
 
 function WARNING(msg) {
@@ -56,7 +56,7 @@ function GenerateTestFile(filename) {
   var testFileHash = hash.digest('hex');
   var end = new Date() - start;
 
-  INFO(`GenerateTestFile: ${testFileName} sha256: ${testFileHash}`);
+  INFO(`GenerateTestFile: ${filename} sha256: ${testFileHash}`);
   console.log('GenerateTestFile Execution time: %dms', end);
 
   return testFileHash;
@@ -186,8 +186,25 @@ function StorageDeal(miner) {
 
 }
 
-function RetrievalDeal() {
+function RetrievalDeal(dataCid) {
+  return new Promise(function (resolve, reject) {
+    INFO("RetrievalDeal [" + dataCid + "]");
+    outFile = RandomTestFileName();
 
+    lotus.ClientRetrieve("dataCid", outFile).then(data => {
+      console.log(data);
+      var hash = SHA256FileSync(retrievingDataItem.filename);
+      INFO("RetrievalDeal [" + dataCid + "] SHA256: " + hash);
+      /*if (hash == retrievingDataItem.hash) {
+        INFO(`Retrieved successfully : ${testFileName} sha256: ${hash}`);
+      }
+      else {
+        WARNING(`Retrieving test failed for : ${testFileName} sha256: ${hash}`);
+      }*/
+    }).catch(error => {
+      ERROR(error);
+    });
+  })
 }
 
 

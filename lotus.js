@@ -55,12 +55,20 @@ function ClientQueryAsk(peerID, miner) {
     return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientQueryAsk", "params": [peerID, miner], "id": 0 }));
 }
 
+function ClientFindData(dataCid) {
+    return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientFindData", "params": [dataCid], "id": 0 }));
+}
+
 function ClientStartDeal(dataCid, miner, price, duration) {
     return spawn('lotus', ["client", "deal", dataCid, miner, price, duration], null);
 }
 
 function ClientImport(file) {
     return spawn('lotus', ["client", "import", file], null);
+}
+
+function ClientRetrieve(dataCid, outFile) {
+    return spawn('lotus', ["client", "retrieve", dataCid, outFile], null);
 }
 
 var args = process.argv.slice(2);
@@ -90,6 +98,8 @@ module.exports = {
     StateMinerPower,
     StateMinerInfo,
     ClientQueryAsk,
+    ClientFindData,
     ClientStartDeal,
     ClientImport,
+    ClientRetrieve,
 };
