@@ -161,7 +161,7 @@ function StorageDeal(miner) {
 
                   //data -> dealCid, miner, filePath, fileHash
                   storagePendingDeals.push({
-                    dealCid: data,
+                    dealCid: data.toString(),
                     miner: miner,
                     filePath: filePath,
                     fileHash: fileHash
@@ -275,9 +275,10 @@ async function RunStorageDeals() {
 
 function StorageDealStatus(dealCid) {
   return new Promise(function (resolve, reject) {
-    INFO("StorageDealStatus: " + data);
+    INFO("StorageDealStatus: " + dealCid);
     lotus.ClientGetDealInfo(dealCid).then(data => {
       INFO("ClientGetDealInfo: " + data);
+      console.log(data);
 
       //if status success add to retriveDealsList, report to BE , delete test file, remove from storagePendingDeals
       //if failed report to BE , delete test file, remove from storagePendingDeals
