@@ -60,7 +60,7 @@ function ClientFindData(dataCid) {
 }
 
 function ClientGetDealInfo(dealCid) {
-    return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientGetDealInfo", "params": [dealCid], "id": 0 }));
+    return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientGetDealInfo", "params": [{"/":dealCid}], "id": 0 }));
 }
 
 function ClientStartDeal(dataCid, miner, price, duration) {
@@ -76,21 +76,15 @@ function ClientRetrieve(dataCid, outFile) {
 }
 
 var args = process.argv.slice(2);
+
 if (args[0] === 'test') {
-
-    ClientStartDeal("dataCid", "miner", "price", "duration").then(data => {
-        console.log(data)
-    }).catch(error => {
-        console.log(error);
-    });
-
-    StateListMiners().then(data => {
-        console.log(data)
-    }).catch(error => {
-        console.log(error);
-    });
-
     StateMinerPower("t089665").then(data => {
+        console.log(data)
+    }).catch(error => {
+        console.log(error);
+    });
+
+    ClientGetDealInfo("bafyreig5thu6awd75jpnbqcjovtn3sfsd6cxnredwa57n43jeukw4n4t3q").then(data => {
         console.log(data)
     }).catch(error => {
         console.log(error);
