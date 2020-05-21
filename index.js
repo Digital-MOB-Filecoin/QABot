@@ -27,7 +27,8 @@ function WARNING(msg) {
 }
 
 function RandomTestFileName() {
-  return uniqueFilename('~/', 'qab-testfile');
+  const path = require('path');
+  return path.join(process.env.HOME,uniqueFilename('.', 'qab-testfile'));
 }
 
 function RandomTestFileSize() {
@@ -273,7 +274,9 @@ async function RunStorageDeals() {
 
 //LoadTopMiners().then(() => RunStorageDeals());
 
-LoadTopMiners().then(
+GenerateTestFile(RandomTestFileName());
+
+/*LoadTopMiners().then(
   () => RunStorageDeals().then(
     () => {}));
 
