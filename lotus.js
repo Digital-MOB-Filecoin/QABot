@@ -84,7 +84,7 @@ if (args[0] === 'test') {
         console.log(error);
     });
 
-    ClientGetDealInfo("bafyreig5thu6awd75jpnbqcjovtn3sfsd6cxnredwa57n43jeukw4n4t3q").then(data => {
+    ClientGetDealInfo("bafyreiflw5y3arrrsvil5abyarcnnxc7a7ort6higwf2mqzevmtrtvnsle").then(data => {
         console.log(data)
     }).catch(error => {
         console.log(error);

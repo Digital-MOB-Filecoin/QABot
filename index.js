@@ -275,6 +275,7 @@ async function RunStorageDeals() {
 
 function StorageDealStatus(dealCid) {
   return new Promise(function (resolve, reject) {
+    INFO("StorageDealStatus: " + data);
     lotus.ClientGetDealInfo(dealCid).then(data => {
       INFO("ClientGetDealInfo: " + data);
 
