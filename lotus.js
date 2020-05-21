@@ -103,6 +103,7 @@ module.exports = {
     StateMinerInfo,
     ClientQueryAsk,
     ClientFindData,
+    ClientGetDealInfo,
     ClientStartDeal,
     ClientImport,
     ClientRetrieve,
