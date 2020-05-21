@@ -59,6 +59,10 @@ function ClientFindData(dataCid) {
     return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientFindData", "params": [dataCid], "id": 0 }));
 }
 
+function ClientGetDealInfo(dealCid) {
+    return execute(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientGetDealInfo", "params": [dealCid], "id": 0 }));
+}
+
 function ClientStartDeal(dataCid, miner, price, duration) {
     return spawn('lotus', ["client", "deal", dataCid, miner, price, duration], null);
 }
