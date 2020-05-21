@@ -27,7 +27,7 @@ function WARNING(msg) {
 }
 
 function RandomTestFileName() {
-  return "~/" + uniqueFilename('./', 'qab-testfile');
+  return uniqueFilename('~/', 'qab-testfile');
 }
 
 function RandomTestFileSize() {
