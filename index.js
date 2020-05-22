@@ -10,6 +10,7 @@ let storagePendingDeals = new Array;
 const RETRIVING_ARRAY_MAX_SIZE = 1000000 //items
 const BUFFER_SIZE = 65536 //64KB
 const MIN_MINER_POWER = 1 //790273982464(736 GiB) //ex
+const FILE_SIZE_EXTRA_SMALL = 100
 const FILE_SIZE_SMALL = 104857600   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE = 5368709120  // (5GB)
@@ -33,7 +34,7 @@ function RandomTestFilePath() {
 }
 
 function RandomTestFileSize() {
-  return FILE_SIZE_SMALL; //TODO: generate random size [FILE_SIZE_SMALL,FILE_SIZE_MEDIUM,FILE_SIZE_LARGE]
+  return FILE_SIZE_EXTRA_SMALL; //TODO: generate random size [FILE_SIZE_SMALL,FILE_SIZE_MEDIUM,FILE_SIZE_LARGE]
 }
 
 function GenerateTestFile(filePath) {
@@ -277,8 +278,7 @@ function StorageDealStatus(dealCid) {
   return new Promise(function (resolve, reject) {
     INFO("StorageDealStatus: " + dealCid);
     lotus.ClientGetDealInfo(dealCid).then(data => {
-      INFO("ClientGetDealInfo: " + data);
-      console.log(data);
+      INFO("ClientGetDealInfo: " + JSON.stringify(data));
 
       //if status success add to retriveDealsList, report to BE , delete test file, remove from storagePendingDeals
       //if failed report to BE , delete test file, remove from storagePendingDeals
