@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const lotus = require('./lotus');
 var uniqueFilename = require('unique-filename')
 
+let stop = false;
 let retrievingDataArray = new Array;
 let topMinersList = new Array;
 let storagePendingDeals = new Array;
@@ -303,7 +304,7 @@ function readyToRetrieve(item) {
 
 async function RunStorageDeals() {
   var it = 0;
-  while (it < topMinersList.length) {
+  while (!stop && (it < topMinersList.length)) {
     await StorageDeal(topMinersList[it].address);
     it++;
   }
@@ -340,20 +341,32 @@ function StorageDealStatus(dealCid) {
 
 async function CheckPendingStorageDeals() {
   var it = 0;
-  while (it < storagePendingDeals.length) {
+  while (!stop && (it < storagePendingDeals.length)) {
     await StorageDealStatus(storagePendingDeals[it].dealCid);
     it++;
   }
 }
 
-LoadTopMiners().then(
-  () => RunStorageDeals().then(
-    () => CheckPendingStorageDeals().then(
-      () => { })));
+const mainLoop = async _ => {
+  await LoadTopMiners();
+
+  while (!stop) {
+    await RunStorageDeals();
+    await CheckPendingStorageDeals();
+  }
+
+};
+
+ mainLoop();
+
 
 function shutdown() {
-  INFO(`Shutdown`);
-  process.exit();
+  stop = true;
+
+  setTimeout(() => { 
+    INFO(`Shutdown`);
+    process.exit(); 
+  }, 3000);
 }
 // listen for TERM signal .e.g. kill
 process.on('SIGTERM', shutdown);
