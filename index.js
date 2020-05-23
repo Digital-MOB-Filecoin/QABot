@@ -52,7 +52,7 @@ function WARNING(msg) {
 }
 
 function RemoveLineBreaks(data) {
-  return data.replace(/(\r\n|\n|\r)/gm, "");
+  return data.toString().replace(/(\r\n|\n|\r)/gm, "");
 }
 
 function RandomTestFilePath() {
@@ -183,12 +183,10 @@ function StorageDeal(miner) {
             lotus.ClientImport(filePath).then(dataCid => {
               INFO("ClientImport : " + RemoveLineBreaks(dataCid));
 
-              let perBlk = ((data.result.Ask.Price * this.state.kbs * 1000) / (1 << 30)) * 2;
-
-              INFO("Before ClientStartDeal: " + RemoveLineBreaks(dataCid) + " " + miner + " " + Math.round(perBlk) + " 10000");
+              INFO("Before ClientStartDeal: " + RemoveLineBreaks(dataCid) + " " + miner + " " + "0.0000000005" + " 10000");
 
               lotus.ClientStartDeal(RemoveLineBreaks(dataCid),
-                miner, Math.round(perBlk), 10000).then(data => {
+                miner, "0.0000000005", 10000).then(data => {
                   INFO("ClientStartDeal: " + RemoveLineBreaks(data));
 
                   //data -> dealCid, miner, filePath, fileHash
