@@ -309,14 +309,24 @@ function StorageDealStatus(dealCid) {
   return new Promise(function (resolve, reject) {
     INFO("StorageDealStatus: " + dealCid);
     lotus.ClientGetDealInfo(dealCid).then(data => {
-      INFO("ClientGetDealInfo: " + JSON.stringify(data));
 
-      //if status success add to retriveDealsList, report to BE , delete test file, remove from storagePendingDeals
-      //if failed report to BE , delete test file, remove from storagePendingDeals
-      //if status pending return
+      if (data && data.result && data.result.State) {
 
-      resolve(true);
+        INFO("ClientGetDealInfo [" + dealCid + "] State: " + dealStates[data.result.State]);
+        INFO("ClientGetDealInfo: " + JSON.stringify(data));
 
+        //"StorageDeal" + 
+
+        //[ INFO ]   ClientGetDealInfo: {"jsonrpc":"2.0","result":{"ProposalCid":{"/":"bafyreigj7s2e62d3ey6oydr5clkfvcjhohstjlfxt6crgycntf6w64hbmy"},"State":18,"Message":"","Provider":"t03150","PieceCID":{"/":"bafk4chzadcoymvhvdzdzvmipm3uwapw5nebvj4orwqe7tmjjxxqerc6xymzq"},"Size":130048,"PricePerEpoch":"500000000","Duration":13129,"DealID":0},"id":0}
+
+        //if status success add to retriveDealsList, report to BE , delete test file, remove from storagePendingDeals
+        //if failed report to BE , delete test file, remove from storagePendingDeals
+        //if status pending return
+        resolve(true);
+      } else {
+        WARNING("ClientGetDealInfo: " + JSON.stringify(data));
+        resolve(false);
+      }
     }).catch(error => {
       ERROR(error);
       resolve(false);
