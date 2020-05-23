@@ -180,18 +180,20 @@ function StorageDeal(miner) {
             var filePath = RandomTestFilePath();
             var fileHash = GenerateTestFile(filePath);
 
-            lotus.ClientImport(filePath).then(dataCid => {
-              INFO("ClientImport : " + RemoveLineBreaks(dataCid));
+            lotus.ClientImport(filePath).then(data => {
+              var dataCid = RemoveLineBreaks(data);
+              INFO("ClientImport : " + dataCid);
 
-              INFO("Before ClientStartDeal: " + RemoveLineBreaks(dataCid) + " " + miner + " " + "0.0000000005" + " 10000");
+              INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + "0.0000000005" + " 10000");
 
-              lotus.ClientStartDeal(RemoveLineBreaks(dataCid),
+              lotus.ClientStartDeal(dataCid,
                 miner, "0.0000000005", 10000).then(data => {
-                  INFO("ClientStartDeal: " + RemoveLineBreaks(data));
+                  var dealCid = RemoveLineBreaks(data);
+                  INFO("ClientStartDeal: " + dealCid);
 
                   //data -> dealCid, miner, filePath, fileHash
                   storagePendingDeals.push({
-                    dealCid: data.toString(),
+                    dealCid: dealCid,
                     miner: miner,
                     filePath: filePath,
                     fileHash: fileHash
