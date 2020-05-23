@@ -15,6 +15,29 @@ const FILE_SIZE_SMALL = 104857600   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE = 5368709120  // (5GB)
 
+const dealStates = [
+  'Unknown',
+  'ProposalNotFound',
+  'ProposalRejected',
+  'ProposalAccepted',
+  'Staged',
+  'Sealing',
+  'ProposalSigned',
+  'Published',
+  'Committed',
+  'Active',
+  'Failing',
+  'Recovering',
+  'Expired',
+  'NotFound',
+
+  'Validating',
+  'Transferring',
+  'VerifyData',
+  'Publishing',
+  'Error'
+]
+
 
 function INFO(msg) {
   console.log('\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
@@ -26,6 +49,10 @@ function ERROR(msg) {
 
 function WARNING(msg) {
   console.log('\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
+}
+
+function RemoveLineBreaks(data) {
+  return data.replace(/(\r\n|\n|\r)/gm, "");
 }
 
 function RandomTestFilePath() {
@@ -154,11 +181,11 @@ function StorageDeal(miner) {
             var fileHash = GenerateTestFile(filePath);
 
             lotus.ClientImport(filePath).then(dataCid => {
-              INFO("ClientImport : " + dataCid);
+              INFO("ClientImport : " + RemoveLineBreaks(dataCid));
 
               lotus.ClientStartDeal("bafkreih7ojhsmt6lzljynwrvyo5gggi2wwxa75fdo3fztpiixbtcagbxmi",
                 miner, data.result.Ask.Price, 10).then(data => {
-                  INFO("ClientStartDeal: " + data);
+                  INFO("ClientStartDeal: " + RemoveLineBreaks(data));
 
                   //data -> dealCid, miner, filePath, fileHash
                   storagePendingDeals.push({
@@ -203,7 +230,7 @@ function RetrievalDeal(dataCid) {
     outFile = RandomTestFilePath();
 
     lotus.ClientRetrieve("dataCid", outFile).then(data => {
-      console.log(data);
+      console.log(RemoveLineBreaks(data));
       var hash = SHA256FileSync(retrievingDataItem.filename);
       INFO("RetrievalDeal [" + dataCid + "] SHA256: " + hash);
       /*if (hash == retrievingDataItem.hash) {
