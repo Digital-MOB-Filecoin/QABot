@@ -355,12 +355,15 @@ async function CheckPendingStorageDeals() {
   }
 }
 
+const pause = () => new Promise(res => setTimeout(res, 1000));
+
 const mainLoop = async _ => {
   await LoadTopMiners();
 
   while (!stop) {
     await RunStorageDeals();
     await CheckPendingStorageDeals();
+    await pause();
   }
 
 };
