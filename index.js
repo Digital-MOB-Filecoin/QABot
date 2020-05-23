@@ -16,26 +16,30 @@ const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE = 5368709120  // (5GB)
 
 const dealStates = [
-  'Unknown',
-  'ProposalNotFound',
-  'ProposalRejected',
-  'ProposalAccepted',
-  'Staged',
-  'Sealing',
-  'ProposalSigned',
-  'Published',
-  'Committed',
-  'Active',
-  'Failing',
-  'Recovering',
-  'Expired',
-  'NotFound',
-
-  'Validating',
-  'Transferring',
-  'VerifyData',
-  'Publishing',
-  'Error'
+"StorageDealUnknown",
+"StorageDealProposalNotFound",
+"StorageDealProposalRejected",
+"StorageDealProposalAccepted",
+"StorageDealAcceptWait",
+"StorageDealStaged",
+"StorageDealSealing",
+"StorageDealActive",
+"StorageDealFailing",
+"StorageDealNotFound",
+"StorageDealFundsEnsured",
+"StorageDealWaitingForDataRequest",
+"StorageDealValidating",
+"StorageDealTransferring",
+"StorageDealWaitingForData",
+"StorageDealVerifyData",
+"StorageDealEnsureProviderFunds",
+"StorageDealEnsureClientFunds",
+"StorageDealProviderFunding",
+"StorageDealClientFunding",
+"StorageDealPublish",
+"StorageDealPublishing",
+"StorageDealError",
+"StorageDealCompleted"
 ]
 
 
