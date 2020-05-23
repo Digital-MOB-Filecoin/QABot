@@ -183,8 +183,12 @@ function StorageDeal(miner) {
             lotus.ClientImport(filePath).then(dataCid => {
               INFO("ClientImport : " + RemoveLineBreaks(dataCid));
 
-              lotus.ClientStartDeal("bafkreih7ojhsmt6lzljynwrvyo5gggi2wwxa75fdo3fztpiixbtcagbxmi",
-                miner, data.result.Ask.Price, 10).then(data => {
+              let perBlk = ((data.result.Ask.Price * this.state.kbs * 1000) / (1 << 30)) * 2;
+
+              INFO("Before ClientStartDeal: " + RemoveLineBreaks(dataCid) + " " + miner + " " + Math.round(perBlk) + " 10000");
+
+              lotus.ClientStartDeal(RemoveLineBreaks(dataCid),
+                miner, Math.round(perBlk), 10000).then(data => {
                   INFO("ClientStartDeal: " + RemoveLineBreaks(data));
 
                   //data -> dealCid, miner, filePath, fileHash
