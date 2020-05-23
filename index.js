@@ -6,7 +6,7 @@ var uniqueFilename = require('unique-filename')
 let stop = false;
 let retrievingDataArray = new Array;
 let topMinersList = new Array;
-let storagePendingDeals = new Array;
+let pendingStorageDeals = new Array;
 
 const RETRIVING_ARRAY_MAX_SIZE = 1000000 //items
 const BUFFER_SIZE = 65536 //64KB
@@ -15,6 +15,7 @@ const FILE_SIZE_EXTRA_SMALL = 100
 const FILE_SIZE_SMALL = 104857600   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE = 5368709120  // (5GB)
+const MAX_PENDING_STORAGE_DEALS = 5;
 
 const dealStates = [
 "StorageDealUnknown",
@@ -197,7 +198,7 @@ function StorageDeal(miner) {
                   INFO("ClientStartDeal: " + dealCid);
 
                   //data -> dealCid, miner, filePath, fileHash
-                  storagePendingDeals.push({
+                  pendingStorageDeals.push({
                     dealCid: dealCid,
                     miner: miner,
                     filePath: filePath,
@@ -303,29 +304,36 @@ function readyToRetrieve(item) {
 }
 
 async function RunStorageDeals() {
-  var it = 0;
-  while (!stop && (it < topMinersList.length)) {
-    await StorageDeal(topMinersList[it].address);
-    it++;
+
+  if (pendingStorageDeals.length <= MAX_PENDING_STORAGE_DEALS) {
+    var it = 0;
+    while (!stop && (it < topMinersList.length)) {
+      await StorageDeal(topMinersList[it].address);
+      it++;
+    }
   }
 }
 
-function StorageDealStatus(dealCid) {
+function StorageDealStatus(pendingStorageDeal) {
   return new Promise(function (resolve, reject) {
-    INFO("StorageDealStatus: " + dealCid);
-    lotus.ClientGetDealInfo(dealCid).then(data => {
+    INFO("StorageDealStatus: " + pendingStorageDeal.dealCid);
+    lotus.ClientGetDealInfo(pendingStorageDeal.dealCid).then(data => {
 
       if (data && data.result && data.result.State) {
 
-        INFO("ClientGetDealInfo [" + dealCid + "] State: " + dealStates[data.result.State]);
+        INFO("ClientGetDealInfo [" + pendingStorageDeal.dealCid + "] State: " + dealStates[data.result.State]);
         INFO("ClientGetDealInfo: " + JSON.stringify(data));
+
+        if (dealStates[data.result.State] == "StorageDealSealing") {
+          DeleteTestFile(pendingStorageDeal.filePath);
+        }
 
         //"StorageDeal" + 
 
         //[ INFO ]   ClientGetDealInfo: {"jsonrpc":"2.0","result":{"ProposalCid":{"/":"bafyreigj7s2e62d3ey6oydr5clkfvcjhohstjlfxt6crgycntf6w64hbmy"},"State":18,"Message":"","Provider":"t03150","PieceCID":{"/":"bafk4chzadcoymvhvdzdzvmipm3uwapw5nebvj4orwqe7tmjjxxqerc6xymzq"},"Size":130048,"PricePerEpoch":"500000000","Duration":13129,"DealID":0},"id":0}
 
-        //if status success add to retriveDealsList, report to BE , delete test file, remove from storagePendingDeals
-        //if failed report to BE , delete test file, remove from storagePendingDeals
+        //if status success add to retriveDealsList, report to BE , delete test file, remove from pendingStorageDeals
+        //if failed report to BE , delete test file, remove from pendingStorageDeals
         //if status pending return
         resolve(true);
       } else {
@@ -341,8 +349,8 @@ function StorageDealStatus(dealCid) {
 
 async function CheckPendingStorageDeals() {
   var it = 0;
-  while (!stop && (it < storagePendingDeals.length)) {
-    await StorageDealStatus(storagePendingDeals[it].dealCid);
+  while (!stop && (it < pendingStorageDeals.length)) {
+    await StorageDealStatus(pendingStorageDeals[it]);
     it++;
   }
 }
