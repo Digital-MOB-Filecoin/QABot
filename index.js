@@ -4,9 +4,9 @@ const lotus = require('./lotus');
 var uniqueFilename = require('unique-filename')
 
 let stop = false;
-let retrievingDataArray = new Array;
 let topMinersList = new Array;
 let pendingStorageDeals = new Array;
+let retriveDealsMap = new Map();
 
 const RETRIVING_ARRAY_MAX_SIZE = 1000000 //items
 const BUFFER_SIZE = 65536 //64KB
@@ -199,10 +199,12 @@ function StorageDeal(miner) {
 
                   //data -> dealCid, miner, filePath, fileHash
                   pendingStorageDeals.push({
+                    dataCid: dataCid,
                     dealCid: dealCid,
                     miner: miner,
                     filePath: filePath,
-                    fileHash: fileHash
+                    fileHash: fileHash,
+                    timestamp: Date.now()
                   })
 
                   //DeleteTestFile(filePath); delete after deal state update
@@ -226,31 +228,33 @@ function StorageDeal(miner) {
       ERROR(error);
       resolve(false);
     });
-})
-
-  //lotus client deal QmPgU56srbA36kzQQP4oQDVASkL4nTYjnf23kosZ2jaN79 t044688 0.0000000005 3840 
-  //   returns: bafyreigurzq3gsodgwukadzqfn6fay7bfwz3gimzxuyzn6j4lmeumeupyu [59]
-  // lotus client list-deals
-
+  })
 }
 
-function RetrievalDeal(dataCid) {
+function RetrieveDeal(dataCid, retrieveDeal) {
   return new Promise(function (resolve, reject) {
-    INFO("RetrievalDeal [" + dataCid + "]");
+    INFO("RetrieveDeal [" + dataCid + "]");
     outFile = RandomTestFilePath();
 
-    lotus.ClientRetrieve("dataCid", outFile).then(data => {
+    lotus.ClientRetrieve(dataCid, outFile).then(data => {
       console.log(RemoveLineBreaks(data));
       var hash = SHA256FileSync(retrievingDataItem.filename);
-      INFO("RetrievalDeal [" + dataCid + "] SHA256: " + hash);
-      /*if (hash == retrievingDataItem.hash) {
+      INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
+      if (hash == retrieveDeal.hash) {
         INFO(`Retrieved successfully : ${testFileName} sha256: ${hash}`);
+        retriveDealsMap.delete(dataCid);
+        //PASSED -> send result to BE
+        resolve(true);
       }
       else {
         WARNING(`Retrieving test failed for : ${testFileName} sha256: ${hash}`);
-      }*/
+        retriveDealsMap.delete(dataCid);
+        //FAILED -> send result to BE
+        resolve(true);
+      }
     }).catch(error => {
       ERROR(error);
+      resolve(false);
     });
   })
 }
@@ -294,7 +298,7 @@ function SHA256FileSync(path) {
   return hash.digest('hex')
 }
 
-function readyToRetrieve(item) {
+function DealTimeout(item) {
   var timeDifference = Math.abs(Date.now() - item.timestamp);
 
   if (timeDifference > 1000 * 10) //10 sec
@@ -314,6 +318,15 @@ async function RunStorageDeals() {
   }
 }
 
+async function RunRetriveDeals() {
+  for (const [key, value] of retriveDealsMap.entries()) {
+    if (stop)
+     break;
+
+    await RetrieveDeal(key, value);
+  }
+}
+
 function StorageDealStatus(pendingStorageDeal) {
   return new Promise(function (resolve, reject) {
     INFO("StorageDealStatus: " + pendingStorageDeal.dealCid);
@@ -324,17 +337,34 @@ function StorageDealStatus(pendingStorageDeal) {
         INFO("ClientGetDealInfo [" + pendingStorageDeal.dealCid + "] State: " + dealStates[data.result.State]);
         INFO("ClientGetDealInfo: " + JSON.stringify(data));
 
-        if (dealStates[data.result.State] == "StorageDealSealing") {
+
+        if (dealStates[data.result.State] == "StorageDealCompleted" ||
+          dealStates[data.result.State] == "StorageDealActive") {
           DeleteTestFile(pendingStorageDeal.filePath);
+
+          if (!retriveDealsMap.has(pendingStorageDeal.dataCid)) {
+            retriveDealsMap.set(pendingStorageDeal.dataCid, {
+              miner: pendingStorageDeal.miner,
+              filePath: pendingStorageDeal.filePath,
+              fileHash: pendingStorageDeal.fileHash,
+              timestamp: Date.now()
+            })
+          }
+
+          //remove from pendingStorageDeals
+          //PASSED -> send result to BE
+        } else if (dealStates[data.result.State] == "StorageDealSealing") {
+
+        } else if (dealStates[data.result.State] == "StorageDealError") {
+          DeleteTestFile(pendingStorageDeal.filePath);
+          //remove from pendingStorageDeals
+          //FAILED -> send result to BE
+        } else if (DealTimeout(pendingStorageDeal.timestamp)) {
+          DeleteTestFile(pendingStorageDeal.filePath);
+          //remove from pendingStorageDeals
+          //FAILED -> send result to BE
         }
 
-        //"StorageDeal" + 
-
-        //[ INFO ]   ClientGetDealInfo: {"jsonrpc":"2.0","result":{"ProposalCid":{"/":"bafyreigj7s2e62d3ey6oydr5clkfvcjhohstjlfxt6crgycntf6w64hbmy"},"State":18,"Message":"","Provider":"t03150","PieceCID":{"/":"bafk4chzadcoymvhvdzdzvmipm3uwapw5nebvj4orwqe7tmjjxxqerc6xymzq"},"Size":130048,"PricePerEpoch":"500000000","Duration":13129,"DealID":0},"id":0}
-
-        //if status success add to retriveDealsList, report to BE , delete test file, remove from pendingStorageDeals
-        //if failed report to BE , delete test file, remove from pendingStorageDeals
-        //if status pending return
         resolve(true);
       } else {
         WARNING("ClientGetDealInfo: " + JSON.stringify(data));
@@ -351,11 +381,12 @@ async function CheckPendingStorageDeals() {
   var it = 0;
   while (!stop && (it < pendingStorageDeals.length)) {
     await StorageDealStatus(pendingStorageDeals[it]);
+    await pause();
     it++;
   }
 }
 
-const pause = () => new Promise(res => setTimeout(res, 1000));
+const pause = () => new Promise(res => setTimeout(res, 2000));
 
 const mainLoop = async _ => {
   await LoadTopMiners();
@@ -363,6 +394,7 @@ const mainLoop = async _ => {
   while (!stop) {
     await RunStorageDeals();
     await CheckPendingStorageDeals();
+    await RunRetriveDeals();
     await pause();
   }
 
