@@ -15,7 +15,7 @@ const FILE_SIZE_EXTRA_SMALL = 100
 const FILE_SIZE_SMALL = 104857600   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE = 5368709120  // (5GB)
-const MAX_PENDING_STORAGE_DEALS = 5;
+const MAX_PENDING_STORAGE_DEALS = 2;
 
 const dealStates = [
 "StorageDealUnknown",
@@ -193,7 +193,7 @@ function StorageDeal(miner) {
               INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + "0.0000000005" + " 10000");
 
               lotus.ClientStartDeal(dataCid,
-                miner, "0.0000000005", 10000).then(data => {
+                miner, "0.0000005000", 10000).then(data => {
                   var dealCid = RemoveLineBreaks(data);
                   INFO("ClientStartDeal: " + dealCid);
 
