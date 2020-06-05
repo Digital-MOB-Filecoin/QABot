@@ -1,6 +1,7 @@
 const fs = require('fs')
 const crypto = require('crypto')
 const lotus = require('./lotus');
+const backend = require('./backend');
 var uniqueFilename = require('unique-filename')
 
 let stop = false;
@@ -43,6 +44,19 @@ const dealStates = [
 "StorageDealError",
 "StorageDealCompleted"
 ]
+
+let stats = {
+  StorageDeals: {
+    Active: 0,
+    Pending: 0,
+    Completed: 0,
+    Failed: 0
+  },
+  RetrieveDeal: {
+    Successful: 0,
+    Failed: 0
+  }
+}
 
 
 function INFO(msg) {
@@ -145,6 +159,30 @@ function GetTopMiners() {
   });
 }
 
+function LoadMiners() {
+  return new Promise(function (resolve, reject) {
+    backend.GetMiners().then(response => {
+      if (response.status == 200 && response.data && response.data.items) {
+        topMinersList.length = 0;
+        response.data.items.forEach(miner => {
+          if (miner.id && miner.power) {
+            topMinersList.push({
+              address: miner.id,
+              power: miner.power
+            })
+          }
+        });
+      }
+
+      INFO("topMinersList: " + topMinersList.length);
+      resolve(true);
+
+    }).catch(error => {
+      console.log(error);
+    });
+  })
+}
+
 function LoadTopMiners() {
   return new Promise(function (resolve, reject) {
     const csv = require('csv-parser')
@@ -193,7 +231,7 @@ function StorageDeal(miner) {
               INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + "0.0000000005" + " 10000");
 
               lotus.ClientStartDeal(dataCid,
-                miner, "0.0000005000", 10000).then(data => {
+                miner, "0.0000000005", 10000).then(data => {
                   var dealCid = RemoveLineBreaks(data);
                   INFO("ClientStartDeal: " + dealCid);
 
@@ -236,18 +274,22 @@ function RetrieveDeal(dataCid, retrieveDeal) {
 
     lotus.ClientRetrieve(dataCid, outFile).then(data => {
       console.log(RemoveLineBreaks(data));
-      var hash = SHA256FileSync(retrievingDataItem.filename);
+      var hash = SHA256FileSync(outFile);
       INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
       if (hash == retrieveDeal.hash) {
         INFO(`Retrieved successfully : ${testFileName} sha256: ${hash}`);
+        stats.RetrieveDeal.Successful++;
         retriveDealsMap.delete(dataCid);
         //PASSED -> send result to BE
+        backend.SaveRetrieveDeal(retrievingDataItem.miner, true, 'success');
         resolve(true);
       }
       else {
         WARNING(`Retrieving test failed for : ${testFileName} sha256: ${hash}`);
+        stats.RetrieveDeal.Failed++;
         retriveDealsMap.delete(dataCid);
         //FAILED -> send result to BE
+        backend.SaveRetrieveDeal(retrievingDataItem.miner, false, 'hash check failed');
         resolve(true);
       }
     }).catch(error => {
@@ -310,6 +352,7 @@ async function RunStorageDeals() {
     var it = 0;
     while (!stop && (it < topMinersList.length)) {
       await StorageDeal(topMinersList[it].address);
+      await pause();
       it++;
     }
   }
@@ -321,6 +364,7 @@ async function RunRetriveDeals() {
      break;
 
     await RetrieveDeal(key, value);
+    await pause();
   }
 }
 
@@ -335,6 +379,13 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 
         if (dealStates[data.result.State] == "StorageDealCompleted" ||
           dealStates[data.result.State] == "StorageDealActive") {
+          
+          if (dealStates[data.result.State] == "StorageDealActive")
+            stats.StorageDeals.Active++;
+          else
+            stats.StorageDeals.Completed++;
+
+
           DeleteTestFile(pendingStorageDeal.filePath);
 
           if (!retriveDealsMap.has(pendingStorageDeal.dataCid)) {
@@ -348,16 +399,22 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 
           storageDealsMap.delete(dealCid);
           //PASSED -> send result to BE
-        } else if (dealStates[data.result.State] == "StorageDealSealing") {
+          backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
 
+        } else if (dealStates[data.result.State] == "StorageDealSealing") {
+          stats.StorageDeals.Pending++;
         } else if (dealStates[data.result.State] == "StorageDealError") {
+          stats.StorageDeals.Failed++;
           DeleteTestFile(pendingStorageDeal.filePath);
           storageDealsMap.delete(dealCid);
           //FAILED -> send result to BE
+          backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'state StorageDealError');
         } else if (DealTimeout(pendingStorageDeal.timestamp)) {
+          stats.StorageDeals.Failed++;
           DeleteTestFile(pendingStorageDeal.filePath);
           storageDealsMap.delete(dealCid);
           //FAILED -> send result to BE
+          backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'timeout');
         }
 
         resolve(true);
@@ -382,22 +439,35 @@ async function CheckPendingStorageDeals() {
   }
 }
 
+function PrintStats() {
+  INFO("*****************STATS*****************");
+  INFO("StorageDeals: TOTAL : " + stats.StorageDeals.Active + stats.StorageDeals.Pending + stats.StorageDeals.Completed + stats.StorageDeals.Failed);
+  INFO("StorageDeals: ACTIVE : " + stats.StorageDeals.Active);
+  INFO("StorageDeals: PENDING : " + stats.StorageDeals.Pending);
+  INFO("StorageDeals: COMPLETED : " + stats.StorageDeals.Completed);
+  INFO("StorageDeals: FAILED : " + stats.StorageDeals.Failed);
+
+  INFO("StorageDeals: TOTAL : " + stats.RetrieveDeal.Successful + stats.RetrieveDeal.Failed);
+  INFO("StorageDeals: SUCCESSFUL : " + stats.RetrieveDeal.Successful);
+  INFO("StorageDeals: FAILED : " + stats.RetrieveDeal.Failed);
+  INFO("***************************************")
+}
+
 const pause = () => new Promise(res => setTimeout(res, 2000));
 
 const mainLoop = async _ => {
-  await LoadTopMiners();
-
   while (!stop) {
+    await LoadMiners();
     await RunStorageDeals();
     await CheckPendingStorageDeals();
     await RunRetriveDeals();
     await pause();
-  }
 
+    PrintStats();
+  }
 };
 
- mainLoop();
-
+mainLoop();
 
 function shutdown() {
   stop = true;
