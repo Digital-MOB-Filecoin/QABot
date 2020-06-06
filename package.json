@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^0.19.2",
+    "bignumber.js": "^9.0.0",
     "csv-parser": "^2.3.2",
     "csv-writer": "^1.6.0",
     "request": "^2.88.2",

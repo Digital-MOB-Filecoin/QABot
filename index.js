@@ -207,6 +207,14 @@ function LoadTopMiners() {
   })
 }
 
+function CalculateStorageDealPrice(askPrice) {
+  const BigNumber = require('bignumber.js');
+
+  let x = new BigNumber(askPrice);
+  let y = new BigNumber(1000000000000000000);
+  return x.dividedBy(y).toString(10);
+}
+
 function StorageDeal(miner) {
   return new Promise(function (resolve, reject) {
 
@@ -217,6 +225,8 @@ function StorageDeal(miner) {
         lotus.ClientQueryAsk(data.result.PeerId, miner).then(data => {
           if (data.error) {
             ERROR("ClientQueryAsk : " + JSON.stringify(data));
+            //FAILED -> send result to BE
+            backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'ClientQueryAsk failed');
             resolve(false);
           } else if (data.result && data.result.Ask && data.result.Ask.Price) {
             INFO("ClientQueryAsk : " + JSON.stringify(data));
@@ -228,10 +238,10 @@ function StorageDeal(miner) {
               var dataCid = RemoveLineBreaks(data);
               INFO("ClientImport : " + dataCid);
 
-              INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + "0.0000000005" + " 10000");
+              INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(data.result.Ask.Price) + "10000");
 
               lotus.ClientStartDeal(dataCid,
-                miner, "0.0000000005", 10000).then(data => {
+                miner, CalculateStorageDealPrice(data.result.Ask.Price), '10000').then(data => {
                   var dealCid = RemoveLineBreaks(data);
                   INFO("ClientStartDeal: " + dealCid);
 
@@ -414,7 +424,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           DeleteTestFile(pendingStorageDeal.filePath);
           storageDealsMap.delete(dealCid);
           //FAILED -> send result to BE
-          backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'timeout');
+          backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'timeout in state: ' + dealStates[data.result.State]);
         }
 
         resolve(true);
