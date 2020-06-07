@@ -9,6 +9,13 @@ let topMinersList = new Array;
 let storageDealsMap = new Map();
 let retriveDealsMap = new Map();
 
+let statsStorageDealsActive = 0;
+let statsStorageDealsPending = 0;
+let statsStorageDealsCompleted = 0;
+let statsStorageDealsFailed = 0;
+let statsRetrieveDealsSuccessful = 0;
+let statsRetrieveDealsFailed = 0;
+
 const RETRIVING_ARRAY_MAX_SIZE = 1000000 //items
 const BUFFER_SIZE = 65536 //64KB
 const MIN_MINER_POWER = 1 //790273982464(736 GiB) //ex
@@ -44,20 +51,6 @@ const dealStates = [
 "StorageDealError",
 "StorageDealCompleted"
 ]
-
-let stats = {
-  StorageDeals: {
-    Active: 0,
-    Pending: 0,
-    Completed: 0,
-    Failed: 0
-  },
-  RetrieveDeal: {
-    Successful: 0,
-    Failed: 0
-  }
-}
-
 
 function INFO(msg) {
   console.log('\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
@@ -226,10 +219,11 @@ function StorageDeal(miner) {
           if (data.error) {
             ERROR("ClientQueryAsk : " + JSON.stringify(data));
             //FAILED -> send result to BE
-            backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'ClientQueryAsk failed');
+            backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + data.error.message);
             resolve(false);
           } else if (data.result && data.result.Ask && data.result.Ask.Price) {
             INFO("ClientQueryAsk : " + JSON.stringify(data));
+            let price = CalculateStorageDealPrice(data.result.Ask.Price);
             //generate new file
             var filePath = RandomTestFilePath();
             var fileHash = GenerateTestFile(filePath);
@@ -238,10 +232,10 @@ function StorageDeal(miner) {
               var dataCid = RemoveLineBreaks(data);
               INFO("ClientImport : " + dataCid);
 
-              INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(data.result.Ask.Price) + "10000");
+              INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + price + " 10000");
 
               lotus.ClientStartDeal(dataCid,
-                miner, CalculateStorageDealPrice(data.result.Ask.Price), '10000').then(data => {
+                miner, price, '10000').then(data => {
                   var dealCid = RemoveLineBreaks(data);
                   INFO("ClientStartDeal: " + dealCid);
 
@@ -288,7 +282,7 @@ function RetrieveDeal(dataCid, retrieveDeal) {
       INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
       if (hash == retrieveDeal.hash) {
         INFO(`Retrieved successfully : ${testFileName} sha256: ${hash}`);
-        stats.RetrieveDeal.Successful++;
+        statsRetrieveDealsSuccessful++;
         retriveDealsMap.delete(dataCid);
         //PASSED -> send result to BE
         backend.SaveRetrieveDeal(retrievingDataItem.miner, true, 'success');
@@ -296,7 +290,7 @@ function RetrieveDeal(dataCid, retrieveDeal) {
       }
       else {
         WARNING(`Retrieving test failed for : ${testFileName} sha256: ${hash}`);
-        stats.RetrieveDeal.Failed++;
+        statsRetrieveDealsFailed++;
         retriveDealsMap.delete(dataCid);
         //FAILED -> send result to BE
         backend.SaveRetrieveDeal(retrievingDataItem.miner, false, 'hash check failed');
@@ -391,9 +385,9 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           dealStates[data.result.State] == "StorageDealActive") {
           
           if (dealStates[data.result.State] == "StorageDealActive")
-            stats.StorageDeals.Active++;
+            statsStorageDealsActive++;
           else
-            stats.StorageDeals.Completed++;
+            statsStorageDealsCompleted++;
 
 
           DeleteTestFile(pendingStorageDeal.filePath);
@@ -412,15 +406,15 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
 
         } else if (dealStates[data.result.State] == "StorageDealSealing") {
-          stats.StorageDeals.Pending++;
+          statsStorageDealsPending++;
         } else if (dealStates[data.result.State] == "StorageDealError") {
-          stats.StorageDeals.Failed++;
+          statsStorageDealsFailed++;
           DeleteTestFile(pendingStorageDeal.filePath);
           storageDealsMap.delete(dealCid);
           //FAILED -> send result to BE
           backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'state StorageDealError');
         } else if (DealTimeout(pendingStorageDeal.timestamp)) {
-          stats.StorageDeals.Failed++;
+          statsStorageDealsFailed++;
           DeleteTestFile(pendingStorageDeal.filePath);
           storageDealsMap.delete(dealCid);
           //FAILED -> send result to BE
@@ -451,15 +445,15 @@ async function CheckPendingStorageDeals() {
 
 function PrintStats() {
   INFO("*****************STATS*****************");
-  INFO("StorageDeals: TOTAL : " + stats.StorageDeals.Active + stats.StorageDeals.Pending + stats.StorageDeals.Completed + stats.StorageDeals.Failed);
-  INFO("StorageDeals: ACTIVE : " + stats.StorageDeals.Active);
-  INFO("StorageDeals: PENDING : " + stats.StorageDeals.Pending);
-  INFO("StorageDeals: COMPLETED : " + stats.StorageDeals.Completed);
-  INFO("StorageDeals: FAILED : " + stats.StorageDeals.Failed);
+  INFO("StorageDeals: TOTAL : " + statsStorageDealsActive + statsStorageDealsPending + statsStorageDealsCompleted + statsStorageDealsFailed);
+  INFO("StorageDeals: ACTIVE : " + statsStorageDealsActive);
+  INFO("StorageDeals: PENDING : " + statsStorageDealsPending);
+  INFO("StorageDeals: COMPLETED : " + statsStorageDealsCompleted);
+  INFO("StorageDeals: FAILED : " + statsStorageDealsFailed);
 
-  INFO("StorageDeals: TOTAL : " + stats.RetrieveDeal.Successful + stats.RetrieveDeal.Failed);
-  INFO("StorageDeals: SUCCESSFUL : " + stats.RetrieveDeal.Successful);
-  INFO("StorageDeals: FAILED : " + stats.RetrieveDeal.Failed);
+  INFO("StorageDeals: TOTAL : " + statsRetrieveDealsSuccessful + statsRetrieveDealsFailed);
+  INFO("StorageDeals: SUCCESSFUL : " + statsRetrieveDealsSuccessful);
+  INFO("StorageDeals: FAILED : " + statsRetrieveDealsFailed);
   INFO("***************************************")
 }
 
