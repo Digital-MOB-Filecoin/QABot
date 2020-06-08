@@ -22,7 +22,7 @@ const FILE_SIZE_EXTRA_SMALL = 100
 const FILE_SIZE_SMALL = 104857600   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE = 5368709120  // (5GB)
-const MAX_PENDING_STORAGE_DEALS = 2;
+const MAX_PENDING_STORAGE_DEALS = 100;
 
 const dealStates = [
 "StorageDealUnknown",
@@ -361,7 +361,7 @@ function SHA256FileSync(path) {
 function DealTimeout(timestamp) {
   var timeDifference = Math.abs(Date.now() - timestamp);
 
-  if (timeDifference > 1000 * 3600) //1 hour
+  if (timeDifference > 1000 * 3600 * 48) //48 hours
     return true;
 
   return false;
@@ -452,7 +452,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 }
 
 async function CheckPendingStorageDeals() {
-  statsStorageDealsPending = storageDealsMap.size();
+  statsStorageDealsPending = storageDealsMap.size;
   for (const [key, value] of storageDealsMap.entries()) {
     if (stop)
      break;
