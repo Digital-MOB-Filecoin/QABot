@@ -9,9 +9,8 @@ let topMinersList = new Array;
 let storageDealsMap = new Map();
 let retriveDealsMap = new Map();
 
-let statsStorageDealsActive = 0;
 let statsStorageDealsPending = 0;
-let statsStorageDealsCompleted = 0;
+let statsStorageDealsSuccessful = 0;
 let statsStorageDealsFailed = 0;
 let statsRetrieveDealsSuccessful = 0;
 let statsRetrieveDealsFailed = 0;
@@ -401,11 +400,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
         if (dealStates[data.result.State] == "StorageDealCompleted" ||
           dealStates[data.result.State] == "StorageDealActive") {
           
-          if (dealStates[data.result.State] == "StorageDealActive")
-            statsStorageDealsActive++;
-          else
-            statsStorageDealsCompleted++;
-
+          statsStorageDealsSuccessful++;
 
           DeleteTestFile(pendingStorageDeal.filePath);
 
@@ -425,7 +420,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 
           storageDealsMap.delete(dealCid);
         } else if (dealStates[data.result.State] == "StorageDealSealing") {
-          statsStorageDealsPending++;
+
         } else if (dealStates[data.result.State] == "StorageDealError") {
           //FAILED -> send result to BE
           FAILED('StoreDeal', pendingStorageDeal.miner, 'state StorageDealError');
@@ -436,7 +431,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           storageDealsMap.delete(dealCid);
         } else if (DealTimeout(pendingStorageDeal.timestamp)) {
           //FAILED -> send result to BE
-          FAILED('StoreDeal', pendingStorageDeal.miner , 'timeout in state: ' + dealStates[data.result.State);
+          FAILED('StoreDeal', pendingStorageDeal.miner , 'timeout in state: ' + dealStates[data.result.State]);
           backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'timeout in state: ' + dealStates[data.result.State]);
 
           storageDealsMap.delete(dealCid);
@@ -457,6 +452,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 }
 
 async function CheckPendingStorageDeals() {
+  statsStorageDealsPending = storageDealsMap.size();
   for (const [key, value] of storageDealsMap.entries()) {
     if (stop)
      break;
@@ -468,10 +464,9 @@ async function CheckPendingStorageDeals() {
 
 function PrintStats() {
   INFO("*****************STATS*****************");
-  INFO("StorageDeals: TOTAL : " + (statsStorageDealsActive + statsStorageDealsPending + statsStorageDealsCompleted + statsStorageDealsFailed));
-  INFO("StorageDeals: ACTIVE : " + statsStorageDealsActive);
+  INFO("StorageDeals: TOTAL : " + (statsStorageDealsPending + statsStorageDealsSuccessful + statsStorageDealsFailed));
   INFO("StorageDeals: PENDING : " + statsStorageDealsPending);
-  INFO("StorageDeals: COMPLETED : " + statsStorageDealsCompleted);
+  INFO("StorageDeals: SUCCESSFUL : " + statsStorageDealsSuccessful);
   INFO("StorageDeals: FAILED : " + statsStorageDealsFailed);
 
   INFO("RetrieveDeals: TOTAL : " + (statsRetrieveDealsSuccessful + statsRetrieveDealsFailed));
