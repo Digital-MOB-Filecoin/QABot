@@ -57,11 +57,25 @@ function INFO(msg) {
 }
 
 function ERROR(msg) {
-  console.log('\x1b[31m', '[ ERR  ] ', '\x1b[0m', msg);
+  console.log('\x1b[31m', '[ ERROR  ] ', '\x1b[0m', msg);
 }
 
 function WARNING(msg) {
   console.log('\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
+}
+
+function PASSED(type, miner, msg) {
+  const util = require('util');
+
+  let line = util.format('[%s][%s] %s', type, miner, msg);
+  console.log('\x1b[36m', '[ PASSED ] ', '\x1b[0m', line);
+}
+
+function FAILED(type, miner, msg) {
+  const util = require('util');
+
+  let line = util.format('[%s][%s] %s', type, miner, msg);
+  console.log('\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
 }
 
 function RemoveLineBreaks(data) {
@@ -219,6 +233,7 @@ function StorageDeal(miner) {
           if (data.error) {
             ERROR("ClientQueryAsk : " + JSON.stringify(data));
             //FAILED -> send result to BE
+            FAILED('StoreDeal', miner, 'ClientQueryAsk failed : ' + data.error.message);
             backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + data.error.message);
             resolve(false);
           } else if (data.result && data.result.Ask && data.result.Ask.Price) {
@@ -281,19 +296,21 @@ function RetrieveDeal(dataCid, retrieveDeal) {
       var hash = SHA256FileSync(outFile);
       INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
       if (hash == retrieveDeal.hash) {
-        INFO(`Retrieved successfully : ${testFileName} sha256: ${hash}`);
+        //PASSED -> send result to BE
+        PASSED('RetrieveDeal', retrievingDataItem.miner, 'success outFile:' + outFile + 'sha256:' + hash);
+        backend.SaveRetrieveDeal(retrievingDataItem.miner, true, 'success');
+
         statsRetrieveDealsSuccessful++;
         retriveDealsMap.delete(dataCid);
-        //PASSED -> send result to BE
-        backend.SaveRetrieveDeal(retrievingDataItem.miner, true, 'success');
         resolve(true);
       }
       else {
-        WARNING(`Retrieving test failed for : ${testFileName} sha256: ${hash}`);
+        //FAILED -> send result to BE
+        FAILED('RetrieveDeal', retrievingDataItem.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.hash);
+        backend.SaveRetrieveDeal(retrievingDataItem.miner, false, 'hash check failed');
+
         statsRetrieveDealsFailed++;
         retriveDealsMap.delete(dataCid);
-        //FAILED -> send result to BE
-        backend.SaveRetrieveDeal(retrievingDataItem.miner, false, 'hash check failed');
         resolve(true);
       }
     }).catch(error => {
@@ -342,10 +359,10 @@ function SHA256FileSync(path) {
   return hash.digest('hex')
 }
 
-function DealTimeout(item) {
-  var timeDifference = Math.abs(Date.now() - item.timestamp);
+function DealTimeout(timestamp) {
+  var timeDifference = Math.abs(Date.now() - timestamp);
 
-  if (timeDifference > 1000 * 10) //10 sec
+  if (timeDifference > 1000 * 3600) //1 hour
     return true;
 
   return false;
@@ -401,24 +418,30 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
             })
           }
 
-          storageDealsMap.delete(dealCid);
+
           //PASSED -> send result to BE
+          PASSED('StoreDeal', pendingStorageDeal.miner, 'success dataCid:' + pendingStorageDeal.dataCid, 'dealCid:' + pendingStorageDeal.dealCid);
           backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
 
+          storageDealsMap.delete(dealCid);
         } else if (dealStates[data.result.State] == "StorageDealSealing") {
           statsStorageDealsPending++;
         } else if (dealStates[data.result.State] == "StorageDealError") {
-          statsStorageDealsFailed++;
-          DeleteTestFile(pendingStorageDeal.filePath);
-          storageDealsMap.delete(dealCid);
           //FAILED -> send result to BE
+          FAILED('StoreDeal', pendingStorageDeal.miner, 'state StorageDealError');
           backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'state StorageDealError');
-        } else if (DealTimeout(pendingStorageDeal.timestamp)) {
+
           statsStorageDealsFailed++;
           DeleteTestFile(pendingStorageDeal.filePath);
           storageDealsMap.delete(dealCid);
+        } else if (DealTimeout(pendingStorageDeal.timestamp)) {
           //FAILED -> send result to BE
+          FAILED('StoreDeal', pendingStorageDeal.miner , 'timeout in state: ' + dealStates[data.result.State);
           backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'timeout in state: ' + dealStates[data.result.State]);
+
+          storageDealsMap.delete(dealCid);
+          statsStorageDealsFailed++;
+          DeleteTestFile(pendingStorageDeal.filePath);
         }
 
         resolve(true);
