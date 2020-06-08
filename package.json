@@ -1,6 +1,6 @@
 {
   "name": "qabot",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "QA Bot",
   "main": "index.js",
   "scripts": {
@@ -11,9 +11,6 @@
   "dependencies": {
     "axios": "^0.19.2",
     "bignumber.js": "^9.0.0",
-    "csv-parser": "^2.3.2",
-    "csv-writer": "^1.6.0",
-    "request": "^2.88.2",
     "spawn-promise": "^0.1.8",
     "unique-filename": "^1.1.1"
   }

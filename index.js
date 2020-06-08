@@ -127,44 +127,6 @@ function DeleteTestFile(filename) {
   }
 }
 
-function GetTopMiners() {
-  const createCsvWriter = require('csv-writer').createObjectCsvWriter;
-  const csvMiners = createCsvWriter({
-    path: 'qabminers.csv',
-    header: [
-      { id: 'address', title: 'ADDRESS' },
-      { id: 'power', title: 'POWER' }
-    ]
-  });
-
-  lotus.StateListMiners().then(json => {
-    json.result.reduce((previousPromise, miner) => {
-      return previousPromise.then(() => {
-        return lotus.StateMinerPower(miner).then(data => {
-          if (data.result.MinerPower.QualityAdjPower > 0) {
-            const records = [
-              { address: miner, power: data.result.MinerPower.QualityAdjPower }
-            ];
-
-            topMinersList.push({
-              address: miner,
-              power: data.result.MinerPower.QualityAdjPower
-            })
-
-            csvMiners.writeRecords(records);
-            INFO(miner + " power: " + data.result.MinerPower.QualityAdjPower);
-          }
-        }).catch(error => {
-          ERROR(error);
-        });
-      });
-    }, Promise.resolve());
-
-  }).catch(error => {
-    ERROR(error);
-  });
-}
-
 function LoadMiners() {
   return new Promise(function (resolve, reject) {
     backend.GetMiners().then(response => {
@@ -186,30 +148,6 @@ function LoadMiners() {
     }).catch(error => {
       console.log(error);
     });
-  })
-}
-
-function LoadTopMiners() {
-  return new Promise(function (resolve, reject) {
-    const csv = require('csv-parser')
-    const fs = require('fs')
-    const results = [];
-    topMinersList = [];
-
-    fs.createReadStream('qabminers1.csv')
-      .pipe(csv())
-      .on('data', (data) => results.push(data))
-      .on('end', () => {
-        results.forEach(miner => {
-          topMinersList.push({
-            address: miner.ADDRESS,
-            power: miner.POWER
-          })
-        });
-
-        INFO("topMinersList: " + topMinersList.length);
-        resolve(true);
-      });
   })
 }
 
