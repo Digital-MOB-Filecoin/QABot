@@ -445,15 +445,15 @@ async function CheckPendingStorageDeals() {
 
 function PrintStats() {
   INFO("*****************STATS*****************");
-  INFO("StorageDeals: TOTAL : " + statsStorageDealsActive + statsStorageDealsPending + statsStorageDealsCompleted + statsStorageDealsFailed);
+  INFO("StorageDeals: TOTAL : " + (statsStorageDealsActive + statsStorageDealsPending + statsStorageDealsCompleted + statsStorageDealsFailed));
   INFO("StorageDeals: ACTIVE : " + statsStorageDealsActive);
   INFO("StorageDeals: PENDING : " + statsStorageDealsPending);
   INFO("StorageDeals: COMPLETED : " + statsStorageDealsCompleted);
   INFO("StorageDeals: FAILED : " + statsStorageDealsFailed);
 
-  INFO("StorageDeals: TOTAL : " + statsRetrieveDealsSuccessful + statsRetrieveDealsFailed);
-  INFO("StorageDeals: SUCCESSFUL : " + statsRetrieveDealsSuccessful);
-  INFO("StorageDeals: FAILED : " + statsRetrieveDealsFailed);
+  INFO("RetrieveDeals: TOTAL : " + (statsRetrieveDealsSuccessful + statsRetrieveDealsFailed));
+  INFO("RetrieveDeals: SUCCESSFUL : " + statsRetrieveDealsSuccessful);
+  INFO("RetrieveDeals: FAILED : " + statsRetrieveDealsFailed);
   INFO("***************************************")
 }
 
