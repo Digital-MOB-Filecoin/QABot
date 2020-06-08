@@ -4,7 +4,11 @@ const config = require('./config');
 
 function GetMiners() {
     const axios = require('axios');
-    return axios.get(config.backend.api + 'miner')
+    return axios.get(config.backend.api + 'miner', {
+        params: {
+            all: true
+        }
+    })
 }
 
 function SaveDeal(miner_id, type, success, message) {

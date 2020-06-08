@@ -234,6 +234,7 @@ function StorageDeal(miner) {
             //FAILED -> send result to BE
             FAILED('StoreDeal', miner, 'ClientQueryAsk failed : ' + data.error.message);
             backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + data.error.message);
+            statsStorageDealsFailed++;
             resolve(false);
           } else if (data.result && data.result.Ask && data.result.Ask.Price) {
             INFO("ClientQueryAsk : " + JSON.stringify(data));
