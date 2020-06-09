@@ -1,12 +1,21 @@
 'use strict';
 
-const request = require('request');
 const config = require('./config');
 var spawn = require("spawn-promise");
 
 function LotusCmd(body) {
-    const axios = require('axios');
-    return axios.post(config.lotus.api, body);
+    return new Promise(function (resolve, reject) {
+        const axios = require('axios');
+        axios.post(config.lotus.api, body, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(response => {
+            resolve(response.data);
+        }).catch(error => {
+            reject(error);
+        });
+    })
 }
 
 function StateListMiners() {
