@@ -5,6 +5,6 @@ module.exports = {
     api: process.env.BACKEND_API || 'https://competition-backend.dev.interplanetary.one/api/',
   },
   lotus: {
-    api: process.env.LOTUS_API || 'http://127.0.0.1:1234/rpc/v0',
+    api: process.env.LOTUS_API || 'http://127.0.0.1:3999/rpc/v0',
   }
 };
