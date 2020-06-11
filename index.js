@@ -25,30 +25,31 @@ const FILE_SIZE_LARGE = 5368709120  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100;
 
 const dealStates = [
-"StorageDealUnknown",
-"StorageDealProposalNotFound",
-"StorageDealProposalRejected",
-"StorageDealProposalAccepted",
-"StorageDealAcceptWait",
-"StorageDealStaged",
-"StorageDealSealing",
-"StorageDealActive",
-"StorageDealFailing",
-"StorageDealNotFound",
-"StorageDealFundsEnsured",
-"StorageDealWaitingForDataRequest",
-"StorageDealValidating",
-"StorageDealTransferring",
-"StorageDealWaitingForData",
-"StorageDealVerifyData",
-"StorageDealEnsureProviderFunds",
-"StorageDealEnsureClientFunds",
-"StorageDealProviderFunding",
-"StorageDealClientFunding",
-"StorageDealPublish",
-"StorageDealPublishing",
-"StorageDealError",
-"StorageDealCompleted"
+  'StorageDealUnknown',
+  'StorageDealProposalNotFound',
+  'StorageDealProposalRejected',
+  'StorageDealProposalAccepted',
+  'StorageDealStaged',
+  'StorageDealSealing',
+  'StorageDealActive',
+  'StorageDealFailing',
+  'StorageDealNotFound',
+  // Internal
+  'StorageDealFundsEnsured',          // Deposited funds as neccesary to create a deal, ready to move forward
+  'StorageDealWaitingForDataRequest', // Client is waiting for a request for the deal data
+  'StorageDealValidating',            // Verifying that deal parameters are good
+  'StorageDealAcceptWait',            // Deciding whether or not to accept the deal
+  'StorageDealTransferring',          // Moving data
+  'StorageDealWaitingForData',        // Manual transfer
+  'StorageDealVerifyData',            // Verify transferred data - generate CAR / piece data
+  'StorageDealEnsureProviderFunds',   // Ensuring that provider collateral is sufficient
+  'StorageDealEnsureClientFunds',     // Ensuring that client funds are sufficient
+  'StorageDealProviderFunding',       // Waiting for funds to appear in Provider balance
+  'StorageDealClientFunding',         // Waiting for funds to appear in Client balance
+  'StorageDealPublish',               // Publishing deal to chain
+  'StorageDealPublishing',            // Waiting for deal to appear on chain
+  'StorageDealError',                 // deal failed with an unexpected error
+  'StorageDealCompleted',             // on provider side, indicates deal is active and info for retrieval is recorded
 ]
 
 function INFO(msg) {
