@@ -135,7 +135,7 @@ async function LoadMiners() {
   let skip = 0;
 
   do {
-    await GetMiners(skip).then(response => {
+    await backend.GetMiners(skip).then(response => {
       if (response.status == 200 && response.data && response.data.items) {
         let i = 0;
         response.data.items.forEach(miner => {
@@ -329,7 +329,7 @@ async function RunStorageDeals() {
     var it = 0;
     while (!stop && (it < topMinersList.length)) {
       await StorageDeal(topMinersList[it].address);
-      await pause();
+      await pause(1000);
       it++;
     }
   }
@@ -341,7 +341,7 @@ async function RunRetriveDeals() {
      break;
 
     await RetrieveDeal(key, value);
-    await pause();
+    await pause(1000);
   }
 }
 
@@ -355,7 +355,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 
 
         if (dealStates[data.result.State] == "StorageDealActive") {
-          
+
           statsStorageDealsSuccessful++;
 
           DeleteTestFile(pendingStorageDeal.filePath);
@@ -378,6 +378,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
         } else if (dealStates[data.result.State] == "StorageDealCompleted") {
           if (retriveDealsMap.has(pendingStorageDeal.dataCid)) {
             retriveDealsMap.delete(pendingStorageDeal.dataCid);
+          }
 
           storageDealsMap.delete(dealCid);
           DeleteTestFile(pendingStorageDeal.filePath);
@@ -395,7 +396,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           storageDealsMap.delete(dealCid);
         } else if (DealTimeout(pendingStorageDeal.timestamp)) {
           //FAILED -> send result to BE
-          FAILED('StoreDeal', pendingStorageDeal.miner , 'timeout in state: ' + dealStates[data.result.State]);
+          FAILED('StoreDeal', pendingStorageDeal.miner, 'timeout in state: ' + dealStates[data.result.State]);
           backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'timeout in state: ' + dealStates[data.result.State]);
 
           storageDealsMap.delete(dealCid);
@@ -422,7 +423,7 @@ async function CheckPendingStorageDeals() {
      break;
 
      await StorageDealStatus(key, value);
-     await pause();
+     await pause(100);
   }
 }
 
@@ -439,7 +440,7 @@ function PrintStats() {
   INFO("***************************************")
 }
 
-const pause = () => new Promise(res => setTimeout(res, 2000));
+const pause = (timeout) => new Promise(res => setTimeout(res, timeout));
 
 const mainLoop = async _ => {
   while (!stop) {
@@ -447,7 +448,7 @@ const mainLoop = async _ => {
     await RunStorageDeals();
     await CheckPendingStorageDeals();
     await RunRetriveDeals();
-    await pause();
+    await pause(2000);
 
     PrintStats();
   }
