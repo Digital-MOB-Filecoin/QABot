@@ -2,11 +2,12 @@
 
 const config = require('./config');
 
-function GetMiners() {
+function GetMiners(skip) {
     const axios = require('axios');
     return axios.get(config.backend.api + 'miner', {
         params: {
-            all: true
+            all: true,
+            skip: skip
         }
     })
 }
