@@ -128,28 +128,45 @@ function DeleteTestFile(filename) {
   }
 }
 
-function LoadMiners() {
-  return new Promise(function (resolve, reject) {
-    backend.GetMiners().then(response => {
+async function LoadMiners() {
+  let tmpMinersList = new Array;
+  let bBreak = false;
+  let count = 0;
+  let skip = 0;
+
+  do {
+    await GetMiners(skip).then(response => {
       if (response.status == 200 && response.data && response.data.items) {
-        topMinersList.length = 0;
+        let i = 0;
         response.data.items.forEach(miner => {
+          i++;
           if (miner.id && miner.power) {
-            topMinersList.push({
+            tmpMinersList.push({
               address: miner.id,
               power: miner.power
             })
           }
         });
+
+        count = response.data.count;
+        skip = tmpMinersList.length;
       }
-
-      INFO("topMinersList: " + topMinersList.length);
-      resolve(true);
-
     }).catch(error => {
       console.log(error);
+      bBreak = true;
     });
-  })
+
+    if (bBreak)
+      break;
+  }
+  while (tmpMinersList.length < count);
+
+  if (tmpMinersList.length) {
+    topMinersList.length = 0;
+    topMinersList = [...tmpMinersList];
+  }
+
+  INFO("topMinersList: " + topMinersList.length);
 }
 
 function CalculateStorageDealPrice(askPrice) {
@@ -337,8 +354,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
         INFO("ClientGetDealInfo: " + JSON.stringify(data));
 
 
-        if (dealStates[data.result.State] == "StorageDealCompleted" ||
-          dealStates[data.result.State] == "StorageDealActive") {
+        if (dealStates[data.result.State] == "StorageDealActive") {
           
           statsStorageDealsSuccessful++;
 
@@ -359,8 +375,16 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
 
           storageDealsMap.delete(dealCid);
-        } else if (dealStates[data.result.State] == "StorageDealSealing") {
+        } else if (dealStates[data.result.State] == "StorageDealCompleted") {
+          if (retriveDealsMap.has(pendingStorageDeal.dataCid)) {
+            retriveDealsMap.delete(pendingStorageDeal.dataCid);
 
+          storageDealsMap.delete(dealCid);
+          DeleteTestFile(pendingStorageDeal.filePath);
+        } else if (dealStates[data.result.State] == "StorageDealStaged") {
+          DeleteTestFile(pendingStorageDeal.filePath);
+        } else if (dealStates[data.result.State] == "StorageDealSealing") {
+          DeleteTestFile(pendingStorageDeal.filePath);
         } else if (dealStates[data.result.State] == "StorageDealError") {
           //FAILED -> send result to BE
           FAILED('StoreDeal', pendingStorageDeal.miner, 'state StorageDealError');
