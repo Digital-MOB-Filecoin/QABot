@@ -121,9 +121,11 @@ function GenerateTestFile(filePath) {
 
 function DeleteTestFile(filename) {
   try {
-    fs.unlinkSync(filename);
-    INFO("DeleteTestFile : " + filename);
-  } catch(err) {
+    if (fs.existsSync(filename)) {
+      fs.unlinkSync(filename);
+      INFO("DeleteTestFile : " + filename);
+    }
+  } catch (err) {
     ERROR(err)
   }
 }
