@@ -2,6 +2,7 @@ const fs = require('fs')
 const crypto = require('crypto')
 const lotus = require('./lotus');
 const backend = require('./backend');
+const isIPFS = require('is-ipfs');
 var uniqueFilename = require('unique-filename')
 
 let stop = false;
@@ -184,9 +185,21 @@ function StorageDeal(miner) {
 
     INFO("StorageDeal [" + miner + "]");
     lotus.StateMinerInfo(miner).then(data => {
-      INFO("StateMinerInfo [" + miner + "] PeerId: " + data.result.PeerId);
       if (data.result.PeerId) {
-        lotus.ClientQueryAsk(data.result.PeerId, miner).then(data => {
+        let peerId;
+
+        if (isIPFS.multihash(data.result.PeerId)) {
+          peerId = data.result.PeerId
+        } else {
+          const PeerId = require('peer-id');
+          const binPeerId = Buffer.from(data.result.PeerId, 'base64');
+          const peerId = PeerId.createFromBytes(binPeerId);
+
+          peerId = peerId.toB58String();
+        }
+
+        INFO("StateMinerInfo [" + miner + "] PeerId: " + peerId);
+        lotus.ClientQueryAsk(peerId, miner).then(data => {
           if (data.error) {
             ERROR("ClientQueryAsk : " + JSON.stringify(data));
             //FAILED -> send result to BE
