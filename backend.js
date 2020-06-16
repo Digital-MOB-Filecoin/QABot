@@ -4,7 +4,7 @@ const config = require('./config');
 
 function GetMiners(skip) {
     const axios = require('axios');
-    return axios.get(config.backend.api + 'miner', {
+    return axios.get(config.backend.api + 'miner/bot', {
         params: {
             all: true,
             skip: skip
@@ -14,6 +14,8 @@ function GetMiners(skip) {
 
 function SaveDeal(miner_id, type, success, message) {
     const axios = require('axios');
+
+    axios.defaults.headers.common = { 'Authorization': `Bearer ${config.backend.token}` }
 
     return axios.post(config.backend.api + 'miner/deal',
         {
@@ -41,14 +43,14 @@ if (args[0] === 'test') {
         console.log(error);
     });
 
-    SaveStoreDeal('t0239267', true, 'test').then(response => {
+    SaveStoreDeal('t02149', true, 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
     });
 
-    SaveRetrieveDeal('t0239267', true, 'test').then(response => {
+    SaveRetrieveDeal('t02149', true, 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
