@@ -292,7 +292,7 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
           console.log(RemoveLineBreaks(data));
           var hash = SHA256FileSync(outFile);
           INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
-          if (hash == retrieveDeal.hash) {
+          if (hash == retrieveDeal.fileHash) {
             //PASSED -> send result to BE
             PASSED('RetrieveDeal', retrieveDeal.miner, 'success outFile:' + outFile + 'sha256:' + hash);
             backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
@@ -302,7 +302,7 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
           }
           else {
             //FAILED -> send result to BE
-            FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.hash);
+            FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
             backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
     
             statsRetrieveDealsFailed++;
