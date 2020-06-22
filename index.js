@@ -3,6 +3,9 @@ const crypto = require('crypto')
 const lotus = require('./lotus');
 const backend = require('./backend');
 const isIPFS = require('is-ipfs');
+const config = require('./config');
+
+
 var uniqueFilename = require('unique-filename')
 
 let stop = false;
@@ -262,7 +265,7 @@ function StorageDeal(miner) {
 
 async function RetrieveDeal(dataCid, retrieveDeal) {
     INFO("RetrieveDeal [" + dataCid + "]");
-    outFile = RandomTestFilePath();
+    let outFile = config.bot.retrieve + RandomTestFilePath();
 
     const walletDefault = await WalletDefaultAddress();
     const wallet = walletDefault.result;
