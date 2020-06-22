@@ -1,6 +1,10 @@
 'use strict';
 
 module.exports = {
+  bot: {
+    import: process.env.BOT_IMPORT_PATH || '/root/import',
+    retrieve: process.env.BOT_RETRIEVE_PATH || '/root/retrieve',
+  },
   backend: {
     api: process.env.BACKEND_API || 'https://competition-backend.dev.interplanetary.one/api/',
     token: process.env.BACKEND_TOKEN || 'eyJpZCI6Miwic2VydmljZV90b2tlbiI6InNlcnZpY2VfdG9rZW4ifQ==',

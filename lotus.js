@@ -65,16 +65,12 @@ function ClientImport2(file) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientImport", "params": [{"Path":"/root/qab-testfile-09af1688","IsCAR":false}], "id": 0 }));
 }
 
-function ClientRetrieve(dataCid, outFile) {
-    return spawn('lotus', ["client", "retrieve", dataCid, outFile], null);
-}
-
 function ClientFindData(dataCid) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientFindData", "params": [{"/":dataCid}], "id": 0 }));
 }
 
-function ClientRetrieve2(dataCid) {
-    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientRetrieve", "params": [{"Root":{"/":dataCid},"Size":133169152, "Total":"133169152", "PaymentInterval":1048576, "PaymentIntervalIncrease":1048576, "Client": "t01989", "Miner":"t01989", "MinerPeerID":"12D3KooWGsMLm2BziXWYf31pL7oqMRfd9nSuHVy1qLi6yzsznqVA"},{"Path":"/root/ret10.data","IsCAR":false}], "id": 0 }));
+function ClientRetrieve(retrievalOffer, outFile) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientRetrieve", "params": [{"Root":{"/":retrievalOffer.Root},"Size":retrievalOffer.Size, "Total":retrievalOffer.Total, "PaymentInterval":retrievalOffer.PaymentInterval, "PaymentIntervalIncrease":retrievalOffer.PaymentIntervalIncrease, "Client": retrievalOffer.Client, "Miner":retrievalOffer.Miner, "MinerPeerID":retrievalOffer.MinerPeerID},{"Path":outFile,"IsCAR":false}], "id": 0 }));
 }
 
 function StateMinerSectorCount(miner) {
@@ -97,6 +93,9 @@ function NetFindPeer(PeerId) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.NetFindPeer", "params": [PeerId], "id": 0 }));
 }
 
+function WalletDefaultAddress() {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.WalletDefaultAddress", "params": [], "id": 0 }));
+}
 
 var args = process.argv.slice(2);
 
@@ -118,31 +117,41 @@ if (args[0] === 'test-ip') {
 
 if (args[0] === 'test-retrive') {
     api = 'http://178.128.158.180:3999/rpc/v0'; // qabot3
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.Y8l11zZ3GcGh3Wtjmt3XQ5jznpOFZKzCu6W57bvzK4o';// qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.cTVmgaA1YTMIhwcj-lPRwH0VALPpHojxPycZEP05bcY';// qabot2
     //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
     //api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
 
-    /*[{"Root":{"/":dataCid},
-    "Size":133169152, 
-    "Total":"133169152", 
-    "PaymentInterval":1048576, 
-    "PaymentIntervalIncrease":1048576, 
-    "Client": "t01989", 
-    "Miner":"t01989", 
-    "MinerPeerID":"12D3KooWGsMLm2BziXWYf31pL7oqMRfd9nSuHVy1qLi6yzsznqVA"},
-    {"Path":"/root/ret1.data","IsCAR":false}]*/
 
-    ClientFindData('QmYyPGBmss54opK4LLHpnx9KCvdMGdfoY9YpJNh9RdEWgT').then(data => {
-        console.log(JSON.stringify(data));
+    (async () => {
+        const walletDefault = await WalletDefaultAddress();
+        const wallet = walletDefault.result;
 
-        /*ClientRetrieve2('QmRsujXtDVYdKRWvZyuGUuoi7XHcAcRpDz3YA91yAo1Uye').then(data => {
-            console.log(JSON.stringify(data));
-        }).catch(error => {
-            console.log(error);
-        });*/
-    }).catch(error => {
-        console.log(error);
-    });
+        console.log(wallet);
+
+        const findData = await ClientFindData('QmdrjQhPaR7MeXFfK8PiFV9oq9Dvme71X1x2kRQX8SxQVs')
+
+        const o = findData.result[0];
+
+        if (findData.result) {
+            const retrievalOffer = {
+                Root: 'QmdrjQhPaR7MeXFfK8PiFV9oq9Dvme71X1x2kRQX8SxQVs',
+                Size: o.Size,
+                Total: o.MinPrice,
+                PaymentInterval: o.PaymentInterval,
+                PaymentIntervalIncrease: o.PaymentIntervalIncrease,
+                Client: wallet,
+                Miner: o.Miner,
+                MinerPeerID: o.MinerPeerID
+            }
+
+            ClientRetrieve2(retrievalOffer,
+                '/root/retrieve/out3.data').then(data => {
+                console.log(JSON.stringify(data));
+            }).catch(error => {
+                console.log(error);
+            });
+        }
+    })();
 }
 
 if (args[0] === 'test-sector') {
@@ -224,12 +233,6 @@ if (args[0] === 'test') {
         console.log(error);
     });
 
-    /*ClientStartDeal2().then(data => {
-        console.log(data)
-    }).catch(error => {
-        console.log(error);
-    });*/
-
     ClientListDeals().then(data => {
         console.log(data)
     }).catch(error => {
@@ -247,4 +250,5 @@ module.exports = {
     ClientStartDeal,
     ClientImport,
     ClientRetrieve,
+    WalletDefaultAddress,
 };
