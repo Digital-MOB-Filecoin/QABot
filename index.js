@@ -185,17 +185,18 @@ function StorageDeal(miner) {
 
     INFO("StorageDeal [" + miner + "]");
     lotus.StateMinerInfo(miner).then(data => {
-      if (data.result.PeerId) {
+      if (data.result && data.result.PeerId) {
         let peerId;
 
         if (isIPFS.multihash(data.result.PeerId)) {
+          INFO('ok');
           peerId = data.result.PeerId
         } else {
           const PeerId = require('peer-id');
           const binPeerId = Buffer.from(data.result.PeerId, 'base64');
-          const peerId = PeerId.createFromBytes(binPeerId);
+          const strPeerId = PeerId.createFromBytes(binPeerId);
 
-          peerId = peerId.toB58String();
+          peerId = strPeerId.toB58String();
         }
 
         INFO("StateMinerInfo [" + miner + "] PeerId: " + peerId);
@@ -249,6 +250,9 @@ function StorageDeal(miner) {
           ERROR(error);
           resolve(false);
         });
+      } else {
+        ERROR("StateMinerInfo : " + JSON.stringify(data));
+        resolve(false);
       }
     }).catch(error => {
       ERROR(error);
@@ -440,6 +444,14 @@ async function CheckPendingStorageDeals() {
      await StorageDealStatus(key, value);
      await pause(100);
   }
+}
+
+function SectorLifeCycle(miner) {
+
+}
+
+function RunSLCCheck() {
+
 }
 
 function PrintStats() {
