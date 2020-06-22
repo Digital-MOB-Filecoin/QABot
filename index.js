@@ -267,12 +267,12 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
     INFO("RetrieveDeal [" + dataCid + "]");
     let outFile = config.bot.retrieve + RandomTestFilePath();
 
-    const walletDefault = await WalletDefaultAddress();
+    const walletDefault = await lotus.WalletDefaultAddress();
     const wallet = walletDefault.result;
 
     console.log(wallet);
 
-    const findData = await ClientFindData(dataCid)
+    const findData = await lotus.ClientFindData(dataCid)
 
     const o = findData.result[0];
 
