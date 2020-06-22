@@ -189,7 +189,6 @@ function StorageDeal(miner) {
         let peerId;
 
         if (isIPFS.multihash(data.result.PeerId)) {
-          INFO('ok');
           peerId = data.result.PeerId
         } else {
           const PeerId = require('peer-id');
