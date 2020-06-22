@@ -265,7 +265,7 @@ function StorageDeal(miner) {
 
 async function RetrieveDeal(dataCid, retrieveDeal) {
     INFO("RetrieveDeal [" + dataCid + "]");
-    let outFile = config.bot.retrieve + RandomTestFilePath();
+    let outFile = RandomTestFilePath();
 
     const walletDefault = await lotus.WalletDefaultAddress();
     const wallet = walletDefault.result;
