@@ -294,16 +294,16 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
           INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
           if (hash == retrieveDeal.hash) {
             //PASSED -> send result to BE
-            PASSED('RetrieveDeal', retrievingDataItem.miner, 'success outFile:' + outFile + 'sha256:' + hash);
-            backend.SaveRetrieveDeal(retrievingDataItem.miner, true, 'success');
+            PASSED('RetrieveDeal', retrieveDeal.miner, 'success outFile:' + outFile + 'sha256:' + hash);
+            backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
     
             statsRetrieveDealsSuccessful++;
             retriveDealsMap.delete(dataCid);
           }
           else {
             //FAILED -> send result to BE
-            FAILED('RetrieveDeal', retrievingDataItem.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.hash);
-            backend.SaveRetrieveDeal(retrievingDataItem.miner, false, 'hash check failed');
+            FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.hash);
+            backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
     
             statsRetrieveDealsFailed++;
             retriveDealsMap.delete(dataCid);
