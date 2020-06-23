@@ -275,13 +275,13 @@ async function StorageDeal2(miner) {
     const minerInfo = await lotus.StateMinerInfo(miner);
 
     let peerId;
-    let sectorSize = data.result.SectorSize;
+    let sectorSize = minerInfo.result.SectorSize;
 
-    if (isIPFS.multihash(data.result.PeerId)) {
-      peerId = data.result.PeerId;
+    if (isIPFS.multihash(minerInfo.result.PeerId)) {
+      peerId = minerInfo.result.PeerId;
     } else {
       const PeerId = require('peer-id');
-      const binPeerId = Buffer.from(data.result.PeerId, 'base64');
+      const binPeerId = Buffer.from(minerInfo.result.PeerId, 'base64');
       const strPeerId = PeerId.createFromBytes(binPeerId);
 
       peerId = strPeerId.toB58String();
