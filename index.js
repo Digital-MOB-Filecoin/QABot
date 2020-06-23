@@ -92,7 +92,7 @@ function RandomTestFilePath() {
 }
 
 function RandomTestFileSize() {
-  return FILE_SIZE_EXTRA_SMALL; //TODO: generate random size [FILE_SIZE_SMALL,FILE_SIZE_MEDIUM,FILE_SIZE_LARGE]
+  return FILE_SIZE_LARGE; //TODO: generate random size [FILE_SIZE_SMALL,FILE_SIZE_MEDIUM,FILE_SIZE_LARGE]
 }
 
 function GenerateTestFile(filePath, size) {
@@ -304,6 +304,7 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
             backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
     
             statsRetrieveDealsSuccessful++;
+            DeleteTestFile(retrieveDeal.filePath);
             retriveDealsMap.delete(dataCid);
           }
           else {
@@ -312,6 +313,7 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
             backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
     
             statsRetrieveDealsFailed++;
+            DeleteTestFile(retrieveDeal.filePath);
             retriveDealsMap.delete(dataCid);
           }
         }).catch(error => {
@@ -369,14 +371,17 @@ function DealTimeout(timestamp) {
 }
 
 async function RunStorageDeals() {
-  if (storageDealsMap.size <= MAX_PENDING_STORAGE_DEALS) {
     var it = 0;
     while (!stop && (it < topMinersList.length)) {
+      if (storageDealsMap.size > MAX_PENDING_STORAGE_DEALS) {
+        INFO("RunStorageDeals pending storage deals = MAX_PENDING_STORAGE_DEALS");
+        break;
+      }
+
       await StorageDeal(topMinersList[it].address);
       await pause(1000);
       it++;
     }
-  }
 }
 
 async function RunRetriveDeals() {
@@ -402,7 +407,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 
           statsStorageDealsSuccessful++;
 
-          DeleteTestFile(pendingStorageDeal.filePath);
+          //DeleteTestFile(pendingStorageDeal.filePath); TODO
 
           if (!retriveDealsMap.has(pendingStorageDeal.dataCid)) {
             retriveDealsMap.set(pendingStorageDeal.dataCid, {
@@ -427,9 +432,9 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           storageDealsMap.delete(dealCid);
           DeleteTestFile(pendingStorageDeal.filePath);
         } else if (dealStates[data.result.State] == "StorageDealStaged") {
-          DeleteTestFile(pendingStorageDeal.filePath);
+          //DeleteTestFile(pendingStorageDeal.filePath); TODO
         } else if (dealStates[data.result.State] == "StorageDealSealing") {
-          DeleteTestFile(pendingStorageDeal.filePath);
+          //DeleteTestFile(pendingStorageDeal.filePath); TODO
         } else if (dealStates[data.result.State] == "StorageDealError") {
           //FAILED -> send result to BE
           FAILED('StoreDeal', pendingStorageDeal.miner, 'state StorageDealError');
