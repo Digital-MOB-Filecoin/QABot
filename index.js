@@ -293,7 +293,7 @@ async function StorageDeal2(miner) {
     if (askResponse.error) {
       ERROR("ClientQueryAsk : " + JSON.stringify(askResponse));
       //FAILED -> send result to BE
-      INFO('StoreDeal', miner, 'ClientQueryAsk failed : ' + askResponse.error.message);
+      FAILED('StoreDeal', miner, 'ClientQueryAsk failed : ' + askResponse.error.message);
       backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
       statsStorageDealsFailed++;
     } else {
