@@ -115,7 +115,7 @@ function GenerateTestFile(filePath, size) {
   var testFileHash = hash.digest('hex');
   var end = new Date() - start;
 
-  INFO(`GenerateTestFile: ${filePath} sha256: ${testFileHash}`);
+  INFO(`GenerateTestFile: ${filePath} size: ${size} sha256: ${testFileHash}`);
   console.log('GenerateTestFile Execution time: %dms', end);
 
   return testFileHash;
