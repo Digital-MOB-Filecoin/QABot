@@ -2,6 +2,7 @@
 
 const config = require('./config');
 var spawn = require("spawn-promise");
+
 let api = config.lotus.api;
 let token = config.lotus.token;
 
@@ -210,43 +211,48 @@ if (args[0] === 'test-sector') {
 
 if (args[0] === 'test-store') {
     api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.h9EjLZcyctRvFgyOeHMSw9XXbKCE8xJKh9CTvWRWViI'; // qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.h5QDbjr-3cTI3Jnc4xczWvUBpK2-jTM65JOQGj2fnvA'; // qabot2
 
-    (async () => { 
-            const importData = await ClientImport('/root/import.log')
-            const { '/': dataCid }  = importData.result;
+    (async () => {
+        try {
+            const importData = await ClientImport('/root/import2.log')
+            const { '/': dataCid } = importData.result;
             console.log(dataCid);
-    
+
             const walletDefault = await WalletDefaultAddress();
             const wallet = walletDefault.result;
 
             console.log(wallet);
-    
+
             const ask = await ClientQueryAsk('12D3KooWS13JZpyKA7t2awQAnawk4njgA6TYTevi5ocrHxnRGmFY', 't02429');
             console.log(ask);
 
-            const epochPrice = '2600';
-    
+            const epochPrice = '500000000';//'2600';
+
             const dataRef = {
                 Data: {
-                  TransferType: 'graphsync',
-                  Root: {
-                    '/': dataCid
-                  },
-                  PieceCid: null,
-                  PieceSize: 0
+                    TransferType: 'graphsync',
+                    Root: {
+                        '/': dataCid
+                    },
+                    PieceCid: null,
+                    PieceSize: 0
                 },
                 Wallet: wallet,
                 Miner: 't02429',
                 EpochPrice: epochPrice,
-                MinBlocksDuration: 300
-              }
+                MinBlocksDuration: 10000
+            }
 
-              const dealData = await ClientStartDeal2(dataRef);
-              const { '/': proposalCid } = dealData.result;
+            const dealData = await ClientStartDeal2(dataRef);
+            const { '/': proposalCid } = dealData.result;
 
-              console.log(proposalCid);
-    
+            console.log(proposalCid);
+
+        } catch (e) {
+            console.log('Error: ' + e.message);
+        }
+
     })();
     
 
@@ -288,6 +294,7 @@ module.exports = {
     ClientFindData,
     ClientGetDealInfo,
     ClientStartDeal,
+    ClientStartDeal2,
     ClientImport,
     ClientRetrieve,
     WalletDefaultAddress,

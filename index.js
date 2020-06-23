@@ -218,7 +218,7 @@ function StorageDeal(miner) {
 
             if (size > sectorSize) {
               ERROR(`GenerateTestFile size: ${size} SectorSize: ${sectorSize}`);
-              size = sectorSize; // TODO remove
+              size = sectorSize / 2; // TODO remove
             }
 
             var fileHash = GenerateTestFile(filePath, size);
@@ -267,6 +267,91 @@ function StorageDeal(miner) {
       resolve(false);
     });
   })
+}
+
+async function StoreDeal2(miner) {
+  INFO("StorageDeal [" + miner + "]");
+  try {
+    const minerInfo = await lotus.StateMinerInfo(miner);
+
+    let peerId;
+    let sectorSize = data.result.SectorSize;
+
+    if (isIPFS.multihash(data.result.PeerId)) {
+      peerId = data.result.PeerId;
+    } else {
+      const PeerId = require('peer-id');
+      const binPeerId = Buffer.from(data.result.PeerId, 'base64');
+      const strPeerId = PeerId.createFromBytes(binPeerId);
+
+      peerId = strPeerId.toB58String();
+    }
+
+    INFO("StateMinerInfo [" + miner + "] PeerId: " + peerId);
+
+    const askResponse = await lotus.ClientQueryAsk(peerId, miner);
+    if (askResponse.error) {
+      ERROR("ClientQueryAsk : " + JSON.stringify(askResponse));
+      //FAILED -> send result to BE
+      INFO('StoreDeal', miner, 'ClientQueryAsk failed : ' + askResponse.error.message);
+      backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
+      statsStorageDealsFailed++;
+    } else {
+
+      //generate new file
+      var filePath = RandomTestFilePath();
+      var size = RandomTestFileSize();
+
+      if (size > sectorSize) {
+        ERROR(`GenerateTestFile size: ${size} SectorSize: ${sectorSize}`);
+        size = sectorSize / 2; // TODO remove
+      }
+
+      var fileHash = GenerateTestFile(filePath, size);
+
+      const importData = await lotus.ClientImport(filePath);
+      const { '/': dataCid } = importData.result;
+      INFO("ClientImport : " + dataCid);
+
+      const walletDefault = await lotus.WalletDefaultAddress();
+      const wallet = walletDefault.result;
+
+      const epochPrice = '500000000';//'2600';
+
+      const dataRef = {
+        Data: {
+          TransferType: 'graphsync',
+          Root: {
+            '/': dataCid
+          },
+          PieceCid: null,
+          PieceSize: 0
+        },
+        Wallet: wallet,
+        Miner: miner,
+        EpochPrice: epochPrice,
+        MinBlocksDuration: 10000
+      }
+
+      const dealData = await lotus.ClientStartDeal2(dataRef);
+      const { '/': proposalCid } = dealData.result;
+
+      INFO("ClientStartDeal: " + proposalCid);
+
+      if (!storageDealsMap.has(proposalCid)) {
+        storageDealsMap.set(proposalCid, {
+          dataCid: dataCid,
+          miner: miner,
+          filePath: filePath,
+          fileHash: fileHash,
+          timestamp: Date.now()
+        })
+      }
+    }
+
+  } catch (e) {
+    ERROR('Error: ' + e.message);
+  }
 }
 
 async function RetrieveDeal(dataCid, retrieveDeal) {
@@ -378,7 +463,7 @@ async function RunStorageDeals() {
         break;
       }
 
-      await StorageDeal(topMinersList[it].address);
+      await StorageDeal2(topMinersList[it].address);
       await pause(1000);
       it++;
     }
