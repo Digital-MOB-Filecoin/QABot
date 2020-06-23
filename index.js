@@ -269,7 +269,7 @@ function StorageDeal(miner) {
   })
 }
 
-async function StoreDeal2(miner) {
+async function StorageDeal2(miner) {
   INFO("StorageDeal [" + miner + "]");
   try {
     const minerInfo = await lotus.StateMinerInfo(miner);
