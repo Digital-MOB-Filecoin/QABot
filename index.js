@@ -95,9 +95,7 @@ function RandomTestFileSize() {
   return FILE_SIZE_EXTRA_SMALL; //TODO: generate random size [FILE_SIZE_SMALL,FILE_SIZE_MEDIUM,FILE_SIZE_LARGE]
 }
 
-function GenerateTestFile(filePath) {
-  var size = RandomTestFileSize();
-
+function GenerateTestFile(filePath, size) {
   const fd = fs.openSync(filePath, 'w');
   const hash = crypto.createHash('sha256');
 
@@ -190,6 +188,7 @@ function StorageDeal(miner) {
     lotus.StateMinerInfo(miner).then(data => {
       if (data.result && data.result.PeerId) {
         let peerId;
+        let sectorSize = data.result.SectorSize;
 
         if (isIPFS.multihash(data.result.PeerId)) {
           peerId = data.result.PeerId
@@ -206,7 +205,7 @@ function StorageDeal(miner) {
           if (data.error) {
             ERROR("ClientQueryAsk : " + JSON.stringify(data));
             //FAILED -> send result to BE
-            FAILED('StoreDeal', miner, 'ClientQueryAsk failed : ' + data.error.message);
+            INFO('StoreDeal', miner, 'ClientQueryAsk failed : ' + data.error.message);
             backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + data.error.message);
             statsStorageDealsFailed++;
             resolve(false);
@@ -215,12 +214,19 @@ function StorageDeal(miner) {
             let price = CalculateStorageDealPrice(data.result.Ask.Price);
             //generate new file
             var filePath = RandomTestFilePath();
-            var fileHash = GenerateTestFile(filePath);
+            var size = RandomTestFileSize();
+
+            if (size > sectorSize) {
+              ERROR(`GenerateTestFile size: ${size} SectorSize: ${sectorSize}`);
+              size = sectorSize; // TODO remove
+            }
+
+            var fileHash = GenerateTestFile(filePath, size);
 
             lotus.ClientImport(filePath).then(data => {
-              var dataCid = RemoveLineBreaks(data);
-              INFO("ClientImport : " + dataCid);
+              const { '/': dataCid }  = data.result;
 
+              INFO("ClientImport : " + dataCid);
               INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + price + " 10000");
 
               lotus.ClientStartDeal(dataCid,
@@ -289,7 +295,7 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
       }
 
       await lotus.ClientRetrieve(retrievalOffer, outFile).then(data => {
-          console.log(RemoveLineBreaks(data));
+          INFO(JSON.stringify(data));
           var hash = SHA256FileSync(outFile);
           INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
           if (hash == retrieveDeal.fileHash) {

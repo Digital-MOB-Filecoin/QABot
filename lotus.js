@@ -53,16 +53,12 @@ function ClientStartDeal(dataCid, miner, price, duration) {
     return spawn('lotus', ["client", "deal", dataCid, miner, price, duration], null);
 }
 
-/*function ClientStartDeal2() {
-    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientStartDeal", "params": [{"Data":{"TransferType":"string value","Root":{"/":"bafkreih7ojhsmt6lzljynwrvyo5gggi2wwxa75fdo3fztpiixbtcagbxmi"},"PieceCid":null,"PieceSize":1024},"Wallet":"t01024","Miner":"t01024","EpochPrice":"0","MinBlocksDuration":42,"DealStartEpoch":10101}], "id": 0 }));
-}*/
-
-function ClientImport(file) {
-    return spawn('lotus', ["client", "import", file], null);
+function ClientStartDeal2(dataRef) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientStartDeal", "params": [dataRef], "id": 0 }));
 }
 
-function ClientImport2(file) {
-    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientImport", "params": [{"Path":"/root/qab-testfile-09af1688","IsCAR":false}], "id": 0 }));
+function ClientImport(file) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientImport", "params": [{"Path":file,"IsCAR":false}], "id": 0 }));
 }
 
 function ClientFindData(dataCid) {
@@ -101,10 +97,10 @@ var args = process.argv.slice(2);
 
 if (args[0] === 'test-ip') {
     api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.h9EjLZcyctRvFgyOeHMSw9XXbKCE8xJKh9CTvWRWViI';// qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.h5QDbjr-3cTI3Jnc4xczWvUBpK2-jTM65JOQGj2fnvA';// qabot2
 
     StateMinerInfo('t02000').then(data => {
-        console.log(data.result.PeerId);
+        console.log(data);
         NetFindPeer(data.result.PeerId).then(data => {
             console.log(JSON.stringify(data.result.Addrs[2]));
         }).catch(error => {
@@ -210,6 +206,50 @@ if (args[0] === 'test-sector') {
     }).catch(error => {
         console.log(error);
     });
+}
+
+if (args[0] === 'test-store') {
+    api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.h9EjLZcyctRvFgyOeHMSw9XXbKCE8xJKh9CTvWRWViI'; // qabot2
+
+    (async () => { 
+            const importData = await ClientImport('/root/import.log')
+            const { '/': dataCid }  = importData.result;
+            console.log(dataCid);
+    
+            const walletDefault = await WalletDefaultAddress();
+            const wallet = walletDefault.result;
+
+            console.log(wallet);
+    
+            const ask = await ClientQueryAsk('12D3KooWS13JZpyKA7t2awQAnawk4njgA6TYTevi5ocrHxnRGmFY', 't02429');
+            console.log(ask);
+
+            const epochPrice = '2600';
+    
+            const dataRef = {
+                Data: {
+                  TransferType: 'graphsync',
+                  Root: {
+                    '/': dataCid
+                  },
+                  PieceCid: null,
+                  PieceSize: 0
+                },
+                Wallet: wallet,
+                Miner: 't02429',
+                EpochPrice: epochPrice,
+                MinBlocksDuration: 300
+              }
+
+              const dealData = await ClientStartDeal2(dataRef);
+              const { '/': proposalCid } = dealData.result;
+
+              console.log(proposalCid);
+    
+    })();
+    
+
 }
 
 if (args[0] === 'test') {
