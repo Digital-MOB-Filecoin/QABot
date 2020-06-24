@@ -4,6 +4,7 @@ const lotus = require('./lotus');
 const backend = require('./backend');
 const isIPFS = require('is-ipfs');
 const config = require('./config');
+const { version } = require('./package.json');
 
 
 var uniqueFilename = require('unique-filename')
@@ -21,8 +22,6 @@ let statsRetrieveDealsFailed = 0;
 
 const RETRIVING_ARRAY_MAX_SIZE = 1000000 //items
 const BUFFER_SIZE = 65536 //64KB
-const MIN_MINER_POWER = 1 //790273982464(736 GiB) //ex
-const FILE_SIZE_EXTRA_SMALL = 100
 const FILE_SIZE_SMALL = 104857600   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE = 5368709120  // (5GB)
@@ -86,9 +85,9 @@ function RemoveLineBreaks(data) {
   return data.toString().replace(/(\r\n|\n|\r)/gm, "");
 }
 
-function RandomTestFilePath() {
+function RandomTestFilePath(basePath) {
   const path = require('path');
-  return path.join(process.env.HOME,uniqueFilename('.', 'qab-testfile'));
+  return uniqueFilename(basePath, 'qab-testfile');
 }
 
 function RandomTestFileSize() {
@@ -211,7 +210,7 @@ async function StorageDeal(miner) {
     } else {
 
       //generate new file
-      var filePath = RandomTestFilePath();
+      var filePath = RandomTestFilePath(config.bot.import);
       var size = RandomTestFileSize();
 
       if (size > sectorSize) {
@@ -267,15 +266,17 @@ async function StorageDeal(miner) {
 }
 
 async function RetrieveDeal(dataCid, retrieveDeal) {
-    INFO("RetrieveDeal [" + dataCid + "]");
-    let outFile = RandomTestFilePath();
+  INFO("RetrieveDeal [" + dataCid + "]");
+
+  try {
+    let outFile = RandomTestFilePath(config.bot.retrieve);
 
     const walletDefault = await lotus.WalletDefaultAddress();
     const wallet = walletDefault.result;
 
     console.log(wallet);
 
-    const findData = await lotus.ClientFindData(dataCid)
+    const findData = await lotus.ClientFindData(dataCid);
 
     const o = findData.result[0];
 
@@ -291,36 +292,34 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
         MinerPeerID: o.MinerPeerID
       }
 
-      await lotus.ClientRetrieve(retrievalOffer, outFile).then(data => {
-          INFO(JSON.stringify(data));
-          var hash = SHA256FileSync(outFile);
-          INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
-          if (hash == retrieveDeal.fileHash) {
-            //PASSED -> send result to BE
-            PASSED('RetrieveDeal', retrieveDeal.miner, 'success outFile:' + outFile + 'sha256:' + hash);
-            backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
-    
-            statsRetrieveDealsSuccessful++;
-            DeleteTestFile(retrieveDeal.filePath);
-            retriveDealsMap.delete(dataCid);
-          }
-          else {
-            //FAILED -> send result to BE
-            FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
-            backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
-    
-            statsRetrieveDealsFailed++;
-            DeleteTestFile(retrieveDeal.filePath);
-            retriveDealsMap.delete(dataCid);
-          }
-        }).catch(error => {
-          ERROR(error);
-        });
+      const data = await lotus.ClientRetrieve(retrievalOffer, outFile);
+      INFO(JSON.stringify(data));
+      var hash = SHA256FileSync(outFile);
+      INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
+      if (hash == retrieveDeal.fileHash) {
+        //PASSED -> send result to BE
+        PASSED('RetrieveDeal', retrieveDeal.miner, 'success outFile:' + outFile + 'sha256:' + hash);
+        backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
+
+        statsRetrieveDealsSuccessful++;
+        DeleteTestFile(retrieveDeal.filePath);
+        retriveDealsMap.delete(dataCid);
+      } else {
+        //FAILED -> send result to BE
+        FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
+
+        statsRetrieveDealsFailed++;
+        DeleteTestFile(retrieveDeal.filePath);
+        retriveDealsMap.delete(dataCid);
+      }
+    } else {
+      ERROR("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
     }
+  } catch (e) {
+    ERROR('Error: ' + e.message);
+  }
 }
-
-
-
 
 function SHA256File(path) {
   return new Promise((resolve, reject) => {
@@ -483,6 +482,7 @@ function RunSLCCheck() {
 
 function PrintStats() {
   INFO("*****************STATS*****************");
+  INFO("QABot " + version);
   INFO("StorageDeals: TOTAL : " + (statsStorageDealsPending + statsStorageDealsSuccessful + statsStorageDealsFailed));
   INFO("StorageDeals: PENDING : " + statsStorageDealsPending);
   INFO("StorageDeals: SUCCESSFUL : " + statsStorageDealsSuccessful);
