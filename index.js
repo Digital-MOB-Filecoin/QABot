@@ -181,95 +181,7 @@ function CalculateStorageDealPrice(askPrice) {
   return x.dividedBy(y).toString(10);
 }
 
-function StorageDeal(miner) {
-  return new Promise(function (resolve, reject) {
-
-    INFO("StorageDeal [" + miner + "]");
-    lotus.StateMinerInfo(miner).then(data => {
-      if (data.result && data.result.PeerId) {
-        let peerId;
-        let sectorSize = data.result.SectorSize;
-
-        if (isIPFS.multihash(data.result.PeerId)) {
-          peerId = data.result.PeerId
-        } else {
-          const PeerId = require('peer-id');
-          const binPeerId = Buffer.from(data.result.PeerId, 'base64');
-          const strPeerId = PeerId.createFromBytes(binPeerId);
-
-          peerId = strPeerId.toB58String();
-        }
-
-        INFO("StateMinerInfo [" + miner + "] PeerId: " + peerId);
-        lotus.ClientQueryAsk(peerId, miner).then(data => {
-          if (data.error) {
-            ERROR("ClientQueryAsk : " + JSON.stringify(data));
-            //FAILED -> send result to BE
-            INFO('StoreDeal', miner, 'ClientQueryAsk failed : ' + data.error.message);
-            backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + data.error.message);
-            statsStorageDealsFailed++;
-            resolve(false);
-          } else if (data.result && data.result.Ask && data.result.Ask.Price) {
-            INFO("ClientQueryAsk : " + JSON.stringify(data));
-            let price = CalculateStorageDealPrice(data.result.Ask.Price);
-            //generate new file
-            var filePath = RandomTestFilePath();
-            var size = RandomTestFileSize();
-
-            if (size > sectorSize) {
-              ERROR(`GenerateTestFile size: ${size} SectorSize: ${sectorSize}`);
-              size = sectorSize / 2; // TODO remove
-            }
-
-            var fileHash = GenerateTestFile(filePath, size);
-
-            lotus.ClientImport(filePath).then(data => {
-              const { '/': dataCid }  = data.result;
-
-              INFO("ClientImport : " + dataCid);
-              INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + price + " 10000");
-
-              lotus.ClientStartDeal(dataCid,
-                miner, price, '10000').then(data => {
-                  var dealCid = RemoveLineBreaks(data);
-                  INFO("ClientStartDeal: " + dealCid);
-
-                  if (!storageDealsMap.has(dealCid)) {
-                    storageDealsMap.set(dealCid, {
-                      dataCid: dataCid,
-                      miner: miner,
-                      filePath: filePath,
-                      fileHash: fileHash,
-                      timestamp: Date.now()
-                    })
-                  }
-
-                  resolve(true);
-                }).catch(error => {
-                  ERROR(error);
-                  resolve(false);
-                });
-            }).catch(error => {
-              ERROR(error);
-              resolve(false);
-            });
-          }
-        }).catch(error => {
-          ERROR(error);
-          resolve(false);
-        });
-      } else {
-        ERROR("StateMinerInfo : " + JSON.stringify(data));
-        resolve(false);
-      }
-    }).catch(error => {
-      ERROR(error);
-      resolve(false);
-    });
-  })
-}
-
-async function StorageDeal2(miner) {
+async function StorageDeal(miner) {
   INFO("StorageDeal [" + miner + "]");
   try {
     const minerInfo = await lotus.StateMinerInfo(miner);
@@ -291,7 +203,7 @@ async function StorageDeal2(miner) {
 
     const askResponse = await lotus.ClientQueryAsk(peerId, miner);
     if (askResponse.error) {
-      ERROR("ClientQueryAsk : " + JSON.stringify(askResponse));
+      INFO("ClientQueryAsk : " + JSON.stringify(askResponse));
       //FAILED -> send result to BE
       FAILED('StoreDeal', miner, 'ClientQueryAsk failed : ' + askResponse.error.message);
       backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
@@ -303,7 +215,7 @@ async function StorageDeal2(miner) {
       var size = RandomTestFileSize();
 
       if (size > sectorSize) {
-        ERROR(`GenerateTestFile size: ${size} SectorSize: ${sectorSize}`);
+        ERROR(`GenerateTestFile size: ${size} > SectorSize: ${sectorSize}`);
         size = sectorSize / 2; // TODO remove
       }
 
@@ -463,7 +375,7 @@ async function RunStorageDeals() {
         break;
       }
 
-      await StorageDeal2(topMinersList[it].address);
+      await StorageDeal(topMinersList[it].address);
       await pause(1000);
       it++;
     }

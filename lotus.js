@@ -1,7 +1,6 @@
 'use strict';
 
 const config = require('./config');
-var spawn = require("spawn-promise");
 
 let api = config.lotus.api;
 let token = config.lotus.token;
@@ -50,11 +49,7 @@ function ClientListDeals() {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientListDeals", "params": [], "id": 0 }));
 }
 
-function ClientStartDeal(dataCid, miner, price, duration) {
-    return spawn('lotus', ["client", "deal", dataCid, miner, price, duration], null);
-}
-
-function ClientStartDeal2(dataRef) {
+function ClientStartDeal(dataRef) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientStartDeal", "params": [dataRef], "id": 0 }));
 }
 
@@ -215,6 +210,11 @@ if (args[0] === 'test-store') {
 
     (async () => {
         try {
+            const minerInfo = StateMinerInfo('t02429');
+            console.log(minerInfo);
+
+            return;
+
             const importData = await ClientImport('/root/import2.log')
             const { '/': dataCid } = importData.result;
             console.log(dataCid);
@@ -244,7 +244,7 @@ if (args[0] === 'test-store') {
                 MinBlocksDuration: 10000
             }
 
-            const dealData = await ClientStartDeal2(dataRef);
+            const dealData = await ClientStartDeal(dataRef);
             const { '/': proposalCid } = dealData.result;
 
             console.log(proposalCid);
@@ -294,7 +294,6 @@ module.exports = {
     ClientFindData,
     ClientGetDealInfo,
     ClientStartDeal,
-    ClientStartDeal2,
     ClientImport,
     ClientRetrieve,
     WalletDefaultAddress,

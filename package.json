@@ -1,6 +1,6 @@
 {
   "name": "qabot",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "QA Bot",
   "main": "index.js",
   "scripts": {
@@ -14,7 +14,6 @@
     "rpc-websockets": "^5.2.2",
     "peer-id": "^0.13.12",
     "is-ipfs": "^1.0.3",
-    "spawn-promise": "^0.1.8",
     "unique-filename": "^1.1.1"
   }
 }
