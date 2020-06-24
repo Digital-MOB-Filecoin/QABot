@@ -226,9 +226,8 @@ async function StorageDeal(miner) {
 
       const walletDefault = await lotus.WalletDefaultAddress();
       const wallet = walletDefault.result;
-
-      const epochPrice = '500000000';//'2600';
-
+      const epochPrice = askResponse.result.Ask.Price;
+      
       const dataRef = {
         Data: {
           TransferType: 'graphsync',
@@ -244,7 +243,7 @@ async function StorageDeal(miner) {
         MinBlocksDuration: 10000
       }
 
-      const dealData = await lotus.ClientStartDeal2(dataRef);
+      const dealData = await lotus.ClientStartDeal(dataRef);
       const { '/': proposalCid } = dealData.result;
 
       INFO("ClientStartDeal: " + proposalCid);
@@ -294,24 +293,30 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
 
       const data = await lotus.ClientRetrieve(retrievalOffer, outFile);
       INFO(JSON.stringify(data));
-      var hash = SHA256FileSync(outFile);
-      INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
-      if (hash == retrieveDeal.fileHash) {
-        //PASSED -> send result to BE
-        PASSED('RetrieveDeal', retrieveDeal.miner, 'success outFile:' + outFile + 'sha256:' + hash);
-        backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
 
-        statsRetrieveDealsSuccessful++;
-        DeleteTestFile(retrieveDeal.filePath);
-        retriveDealsMap.delete(dataCid);
+      if (data.error) {
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " " + data.error);
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, data.error);
       } else {
-        //FAILED -> send result to BE
-        FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
+        var hash = SHA256FileSync(outFile);
+        INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
+        if (hash == retrieveDeal.fileHash) {
+          //PASSED -> send result to BE
+          PASSED('RetrieveDeal', retrieveDeal.miner, 'success outFile:' + outFile + 'sha256:' + hash);
+          backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
 
-        statsRetrieveDealsFailed++;
-        DeleteTestFile(retrieveDeal.filePath);
-        retriveDealsMap.delete(dataCid);
+          statsRetrieveDealsSuccessful++;
+          DeleteTestFile(retrieveDeal.filePath);
+          retriveDealsMap.delete(dataCid);
+        } else {
+          //FAILED -> send result to BE
+          FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
+          backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
+
+          statsRetrieveDealsFailed++;
+          DeleteTestFile(retrieveDeal.filePath);
+          retriveDealsMap.delete(dataCid);
+        }
       }
     } else {
       ERROR("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
