@@ -1,9 +1,10 @@
 const fs = require('fs')
 const crypto = require('crypto')
-const lotus = require('./lotus');
-const backend = require('./backend');
+const lotus = require('./lotus');;
 const isIPFS = require('is-ipfs');
 const config = require('./config');
+const { BackendClient } = require('./backend')
+const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
 
 
@@ -26,6 +27,18 @@ const FILE_SIZE_SMALL = 104857600   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
 const FILE_SIZE_LARGE = 5368709120  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100;
+
+let backend;
+let standalone = false;
+
+var args = process.argv.slice(2);
+if (args[0] === 'standalone') {
+  standalone = true;
+  backend = BackendClient.Shared(true);
+} else {
+  standalone = false;
+  backend = BackendClient.Shared(false);
+}
 
 const dealStates = [
   'StorageDealUnknown',
@@ -131,7 +144,7 @@ function DeleteTestFile(filename) {
   }
 }
 
-async function LoadMiners() {
+async function LoadMinersFromBackend() {
   let tmpMinersList = new Array;
   let bBreak = false;
   let count = 0;
@@ -170,6 +183,42 @@ async function LoadMiners() {
   }
 
   INFO("topMinersList: " + topMinersList.length);
+}
+
+async function LoadMinersLotusWs() {
+  const lotusWsClient = LotusWsClient.Shared();
+
+  try {
+    const miners = await lotusWsClient.StateListMiners();
+
+    var minersSlice = miners;
+    while (minersSlice.length) {
+      await Promise.all(minersSlice.splice(0, 50).map(async (miner) => {
+        const power = await lotusWsClient.StateMinerPower(miner);
+        if (power.MinerPower.QualityAdjPower > 0) {
+          topMinersList.push({
+            address: miner,
+            power: power.MinerPower.QualityAdjPower
+          })
+        }
+      }));
+    }
+
+    lotusWsClient.Close();
+
+    INFO("LoadMinersLotusWs topMinersList: " + topMinersList.length);
+
+  } catch (e) {
+    console.log('Error: ' + e.message);
+  }
+}
+
+async function LoadMiners() {
+  if (standalone) {
+    return await LoadMinersLotusWs();
+  } else {
+    return await LoadMinersFromBackend();
+  }
 }
 
 function CalculateStorageDealPrice(askPrice) {
@@ -227,7 +276,7 @@ async function StorageDeal(miner) {
       const walletDefault = await lotus.WalletDefaultAddress();
       const wallet = walletDefault.result;
       const epochPrice = askResponse.result.Ask.Price;
-      
+
       const dataRef = {
         Data: {
           TransferType: 'graphsync',
@@ -272,12 +321,11 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
 
     const walletDefault = await lotus.WalletDefaultAddress();
     const wallet = walletDefault.result;
-
-    console.log(wallet);
-
     const findData = await lotus.ClientFindData(dataCid);
+    
+    INFO("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
 
-    const o = findData.result[0];
+    const o = findData.result[0];    
 
     if (findData.result) {
       const retrievalOffer = {
