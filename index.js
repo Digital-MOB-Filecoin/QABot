@@ -4,6 +4,7 @@ const lotus = require('./lotus');;
 const isIPFS = require('is-ipfs');
 const config = require('./config');
 const timestamp = require('time-stamp');
+const perf = require('execution-time')();
 const { BackendClient } = require('./backend')
 const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
@@ -95,6 +96,8 @@ function FAILED(type, miner, msg) {
   console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
 }
 
+INFO(Number.MAX_VALUE);
+
 function RemoveLineBreaks(data) {
   return data.toString().replace(/(\r\n|\n|\r)/gm, "");
 }
@@ -112,7 +115,7 @@ function GenerateTestFile(filePath, size) {
   const fd = fs.openSync(filePath, 'w');
   const hash = crypto.createHash('sha256');
 
-  var start = new Date();
+  perf.start('GenerateTestFile');
 
   try {
     for (i = 0; i < size / BUFFER_SIZE; i++) {
@@ -126,10 +129,10 @@ function GenerateTestFile(filePath, size) {
   }
 
   var testFileHash = hash.digest('hex');
-  var end = new Date() - start;
 
-  INFO(`GenerateTestFile: ${filePath} size: ${size} sha256: ${testFileHash}`);
-  console.log('GenerateTestFile Execution time: %dms', end);
+  const results = perf.stop('GenerateTestFile');
+
+  INFO(`GenerateTestFile: Execution time: ${results.time} ${filePath} size: ${size} sha256: ${testFileHash}`);
 
   return testFileHash;
 }
