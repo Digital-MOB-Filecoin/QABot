@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const lotus = require('./lotus');;
 const isIPFS = require('is-ipfs');
 const config = require('./config');
+const timestamp = require('time-stamp');
 const { BackendClient } = require('./backend')
 const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
@@ -69,29 +70,29 @@ const dealStates = [
 ]
 
 function INFO(msg) {
-  console.log('\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
 }
 
 function ERROR(msg) {
-  console.log('\x1b[31m', '[ ERROR  ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[31m', '[ ERROR  ] ', '\x1b[0m', msg);
 }
 
 function WARNING(msg) {
-  console.log('\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
 }
 
 function PASSED(type, miner, msg) {
   const util = require('util');
 
   let line = util.format('[%s][%s] %s', type, miner, msg);
-  console.log('\x1b[36m', '[ PASSED ] ', '\x1b[0m', line);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[36m', '[ PASSED ] ', '\x1b[0m', line);
 }
 
 function FAILED(type, miner, msg) {
   const util = require('util');
 
   let line = util.format('[%s][%s] %s', type, miner, msg);
-  console.log('\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
 }
 
 function RemoveLineBreaks(data) {
