@@ -96,8 +96,6 @@ function FAILED(type, miner, msg) {
   console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
 }
 
-INFO(Number.MAX_VALUE);
-
 function RemoveLineBreaks(data) {
   return data.toString().replace(/(\r\n|\n|\r)/gm, "");
 }
