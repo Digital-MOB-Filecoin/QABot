@@ -5,6 +5,7 @@ const isIPFS = require('is-ipfs');
 const config = require('./config');
 const timestamp = require('time-stamp');
 const perf = require('execution-time')();
+const { Timeout, DealTimeout } = require('./utils');
 const { BackendClient } = require('./backend')
 const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
@@ -343,10 +344,14 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
         MinerPeerID: o.MinerPeerID
       }
 
-      const data = await lotus.ClientRetrieve(retrievalOffer, outFile);
+      const timeoutPromise = Timeout(3600); // 1 hour lotus.ClientRetrieve timeout
+      const data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
+
       INFO(JSON.stringify(data));
 
-      if (data.error) {
+      if (data === 'timeout') {
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " retrieve deal timeout");
+      } else if (data.error) {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " " + data.error);
         backend.SaveRetrieveDeal(retrieveDeal.miner, false, data.error);
       } else {
@@ -412,15 +417,6 @@ function SHA256FileSync(path) {
   }
 
   return hash.digest('hex')
-}
-
-function DealTimeout(timestamp) {
-  var timeDifference = Math.abs(Date.now() - timestamp);
-
-  if (timeDifference > 1000 * 3600 * 48) //48 hours
-    return true;
-
-  return false;
 }
 
 async function RunStorageDeals() {
