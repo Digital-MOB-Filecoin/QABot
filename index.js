@@ -10,7 +10,6 @@ const { BackendClient } = require('./backend')
 const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
 
-
 var uniqueFilename = require('unique-filename')
 
 let stop = false;
@@ -466,7 +465,6 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
               timestamp: Date.now()
             })
           }
-
 
           //PASSED -> send result to BE
           PASSED('StoreDeal', pendingStorageDeal.miner, 'success dataCid:' + pendingStorageDeal.dataCid, 'dealCid:' + pendingStorageDeal.dealCid);

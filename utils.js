@@ -20,12 +20,3 @@ module.exports = {
     Timeout,
     DealTimeout,
 };
-
-function Test() {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            console.log('test');
-            resolve();
-        }, 10 * 1000);
-    });
-}
