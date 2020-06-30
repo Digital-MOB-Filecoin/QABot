@@ -35,6 +35,11 @@ class BackendClient {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
+        const MAX_LENGTH = 500;
+        var trimmedMessage = message.length > MAX_LENGTH ?
+            message.substring(0, MAX_LENGTH - 3) + "..." :
+            message;
+
         const axios = require('axios');
         axios.defaults.headers.common = { 'Authorization': `Bearer ${config.backend.token}` }
 
@@ -43,7 +48,7 @@ class BackendClient {
                 miner_id: miner_id,
                 type: type,
                 success: success,
-                message: message,
+                message: trimmedMessage,
             })
     }
 
@@ -64,7 +69,7 @@ class BackendClient {
 
 var args = process.argv.slice(2);
 if (args[0] === 'test') {
-    const backend = BackendClient.Shared(true);
+    const backend = BackendClient.Shared();
 
     backend.GetMiners().then(response => {
         console.log(response.data);

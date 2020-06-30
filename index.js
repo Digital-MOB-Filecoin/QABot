@@ -5,7 +5,7 @@ const isIPFS = require('is-ipfs');
 const config = require('./config');
 const timestamp = require('time-stamp');
 const perf = require('execution-time')();
-const { Timeout, DealTimeout } = require('./utils');
+const { FormatBytes, DealTimeout, Timeout } = require('./utils');
 const { BackendClient } = require('./backend')
 const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
@@ -16,6 +16,7 @@ let stop = false;
 let topMinersList = new Array;
 let storageDealsMap = new Map();
 let retriveDealsMap = new Map();
+let minersDataStatsMap = new Map();
 
 let statsStorageDealsPending = 0;
 let statsStorageDealsSuccessful = 0;
@@ -130,7 +131,7 @@ function GenerateTestFile(filePath, size) {
 
   const results = perf.stop('GenerateTestFile');
 
-  INFO(`GenerateTestFile: Execution time: ${results.time} ${filePath} size: ${size} sha256: ${testFileHash}`);
+  INFO(`GenerateTestFile: Execution time: ${results.time} ${filePath} size: ${FormatBytes(size)} sha256: ${testFileHash}`);
 
   return testFileHash;
 }
@@ -265,7 +266,7 @@ async function StorageDeal(miner) {
       var size = RandomTestFileSize();
 
       if (size > sectorSize) {
-        ERROR(`GenerateTestFile size: ${size} > SectorSize: ${sectorSize}`);
+        ERROR(`GenerateTestFile size: ${FormatBytes(size)} > SectorSize: ${FormatBytes(sectorSize)}`);
         size = sectorSize / 2; // TODO remove
       }
 
@@ -305,6 +306,7 @@ async function StorageDeal(miner) {
           miner: miner,
           filePath: filePath,
           fileHash: fileHash,
+          size: size,
           timestamp: Date.now()
         })
       }
@@ -460,13 +462,21 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
               miner: pendingStorageDeal.miner,
               filePath: pendingStorageDeal.filePath,
               fileHash: pendingStorageDeal.fileHash,
+              size: pendingStorageDeal.size,
               timestamp: Date.now()
             })
           }
 
-          //PASSED -> send result to BE
-          PASSED('StoreDeal', pendingStorageDeal.miner, 'success dataCid:' + pendingStorageDeal.dataCid, 'dealCid:' + pendingStorageDeal.dealCid);
+          //PASSED -> send result to BE [dealcid;datacid;size]
+          PASSED('StoreDeal', pendingStorageDeal.miner, pendingStorageDeal.dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
           backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+
+          if (minersDataStatsMap.has(pendingStorageDeal.miner)) {
+            const oldSize = minersDataStatsMap.get(pendingStorageDeal.miner);
+            minersDataStatsMap.set(pendingStorageDeal.miner, pendingStorageDeal.size + oldSize);
+          } else {
+            minersDataStatsMap.set(pendingStorageDeal.miner, pendingStorageDeal.size);
+          }
 
           storageDealsMap.delete(dealCid);
         } else if (dealStates[data.result.State] == "StorageDealCompleted") {
@@ -540,6 +550,10 @@ function PrintStats() {
   INFO("RetrieveDeals: TOTAL : " + (statsRetrieveDealsSuccessful + statsRetrieveDealsFailed));
   INFO("RetrieveDeals: SUCCESSFUL : " + statsRetrieveDealsSuccessful);
   INFO("RetrieveDeals: FAILED : " + statsRetrieveDealsFailed);
+  INFO("***************************************")
+  for (const [key, value] of minersDataStatsMap.entries()) {
+    INFO(`[${key}] ${FormatBytes(value)}`);
+  }
   INFO("***************************************")
 }
 
