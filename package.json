@@ -1,6 +1,6 @@
 {
   "name": "qabot",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "QA Bot",
   "main": "index.js",
   "scripts": {
@@ -9,12 +9,14 @@
   "author": "Andreea Stefan, George Robert Stefan",
   "license": "ISC",
   "dependencies": {
+    "args": "^5.0.1",
     "axios": "^0.19.2",
     "bignumber.js": "^9.0.0",
     "execution-time": "^1.4.1",
     "is-ipfs": "^1.0.3",
     "peer-id": "^0.13.12",
     "rpc-websockets": "^5.2.2",
+    "spawn-promise": "^0.1.8",
     "time-stamp": "^2.2.0",
     "unique-filename": "^1.1.1"
   }

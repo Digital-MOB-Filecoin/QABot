@@ -32,14 +32,18 @@ const FILE_SIZE_LARGE = 5368709120  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100;
 
 let backend;
-let standalone = false;
 
-var args = process.argv.slice(2);
-if (args[0] === 'standalone') {
-  standalone = true;
+const args = require('args')
+ 
+args
+  .option('standalone', 'Run the Bot standalone')
+  .option('cmdMode', 'Use lotus commands')
+ 
+const flags = args.parse(process.argv)
+
+if (flags.standalone) {
   backend = BackendClient.Shared(true);
 } else {
-  standalone = false;
   backend = BackendClient.Shared(false);
 }
 
@@ -217,7 +221,7 @@ async function LoadMinersLotusWs() {
 }
 
 async function LoadMiners() {
-  if (standalone) {
+  if (flags.standalone) {
     return await LoadMinersLotusWs();
   } else {
     return await LoadMinersFromBackend();
@@ -232,7 +236,7 @@ function CalculateStorageDealPrice(askPrice) {
   return x.dividedBy(y).toString(10);
 }
 
-async function StorageDeal(miner) {
+async function StorageDeal(miner, cmdMode = false) {
   INFO("StorageDeal [" + miner + "]");
   try {
     const minerInfo = await lotus.StateMinerInfo(miner);
@@ -276,32 +280,41 @@ async function StorageDeal(miner) {
       const { '/': dataCid } = importData.result;
       INFO("ClientImport : " + dataCid);
 
-      const walletDefault = await lotus.WalletDefaultAddress();
-      const wallet = walletDefault.result;
-      const epochPrice = askResponse.result.Ask.Price;
+      let dealCid;
 
-      const dataRef = {
-        Data: {
-          TransferType: 'graphsync',
-          Root: {
-            '/': dataCid
+      if (cmdMode) {
+        INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(data.result.Ask.Price) + "10000");
+        var response = await lotus.ClientStartDeal(dataCid, miner, CalculateStorageDealPrice(data.result.Ask.Price), '10000');
+        dealCid = RemoveLineBreaks(response);
+      } else {
+        const walletDefault = await lotus.WalletDefaultAddress();
+        const wallet = walletDefault.result;
+        const epochPrice = askResponse.result.Ask.Price;
+
+        const dataRef = {
+          Data: {
+            TransferType: 'graphsync',
+            Root: {
+              '/': dataCid
+            },
+            PieceCid: null,
+            PieceSize: 0
           },
-          PieceCid: null,
-          PieceSize: 0
-        },
-        Wallet: wallet,
-        Miner: miner,
-        EpochPrice: epochPrice,
-        MinBlocksDuration: 10000
+          Wallet: wallet,
+          Miner: miner,
+          EpochPrice: epochPrice,
+          MinBlocksDuration: 10000
+        }
+
+        const dealData = await lotus.ClientStartDeal(dataRef);
+        const { '/': proposalCid } = dealData.result;
+        dealCid = proposalCid;
       }
 
-      const dealData = await lotus.ClientStartDeal(dataRef);
-      const { '/': proposalCid } = dealData.result;
+      INFO("ClientStartDeal: " + dealCid);
 
-      INFO("ClientStartDeal: " + proposalCid);
-
-      if (!storageDealsMap.has(proposalCid)) {
-        storageDealsMap.set(proposalCid, {
+      if (!storageDealsMap.has(dealCid)) {
+        storageDealsMap.set(dealCid, {
           dataCid: dataCid,
           miner: miner,
           filePath: filePath,
@@ -317,19 +330,18 @@ async function StorageDeal(miner) {
   }
 }
 
-async function RetrieveDeal(dataCid, retrieveDeal) {
+async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
   INFO("RetrieveDeal [" + dataCid + "]");
 
   try {
     let outFile = RandomTestFilePath(config.bot.retrieve);
-
     const walletDefault = await lotus.WalletDefaultAddress();
     const wallet = walletDefault.result;
     const findData = await lotus.ClientFindData(dataCid);
-    
+
     INFO("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
 
-    const o = findData.result[0];    
+    const o = findData.result[0];
 
     if (findData.result) {
       const retrievalOffer = {
@@ -344,7 +356,15 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
       }
 
       const timeoutPromise = Timeout(3600); // 1 hour lotus.ClientRetrieve timeout
-      const data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
+      let data;
+
+      if (cmdMode) {
+        const timeoutPromise = Timeout(3600); // 1 hour lotus.ClientRetrieve timeout
+        const response = await Promise.race([lotus.ClientRetrieveCmd(retrievalOffer, outFile), timeoutPromise]);
+        data = RemoveLineBreaks(response);
+      } else {
+        data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
+      }
 
       INFO(JSON.stringify(data));
 
@@ -419,17 +439,17 @@ function SHA256FileSync(path) {
 }
 
 async function RunStorageDeals() {
-    var it = 0;
-    while (!stop && (it < topMinersList.length)) {
-      if (storageDealsMap.size > MAX_PENDING_STORAGE_DEALS) {
-        INFO("RunStorageDeals pending storage deals = MAX_PENDING_STORAGE_DEALS");
-        break;
-      }
-
-      await StorageDeal(topMinersList[it].address);
-      await pause(1000);
-      it++;
+  var it = 0;
+  while (!stop && (it < topMinersList.length)) {
+    if (storageDealsMap.size > MAX_PENDING_STORAGE_DEALS) {
+      INFO("RunStorageDeals pending storage deals = MAX_PENDING_STORAGE_DEALS");
+      break;
     }
+
+    await StorageDeal(topMinersList[it].address, flags.cmdMode);
+    await pause(1000);
+    it++;
+  }
 }
 
 async function RunRetriveDeals() {
@@ -437,7 +457,7 @@ async function RunRetriveDeals() {
     if (stop)
      break;
 
-    await RetrieveDeal(key, value);
+    await RetrieveDeal(key, value, flags.cmdMode);
     await pause(1000);
   }
 }

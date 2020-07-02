@@ -1,6 +1,7 @@
 'use strict';
 
 const config = require('./config');
+var spawn = require("spawn-promise");
 
 let api = config.lotus.api;
 let token = config.lotus.token;
@@ -89,6 +90,14 @@ function WalletDefaultAddress() {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.WalletDefaultAddress", "params": [], "id": 0 }));
 }
 
+function ClientStartDealCmd(dataCid, miner, price, duration) {
+    return spawn('lotus', ["client", "deal", dataCid, miner, price, duration], null);
+}
+
+function ClientRetrieveCmd(dataCid, outFile) {
+    return spawn('lotus', ["client", "retrieve", dataCid, outFile], null);
+}
+
 var args = process.argv.slice(2);
 
 if (args[0] === 'test-ip') {
@@ -136,7 +145,7 @@ if (args[0] === 'test-retrive') {
                 MinerPeerID: o.MinerPeerID
             }
 
-            ClientRetrieve2(retrievalOffer,
+            ClientRetrieve(retrievalOffer,
                 '/root/retrieve/out3.data').then(data => {
                 console.log(JSON.stringify(data));
             }).catch(error => {
@@ -206,16 +215,17 @@ if (args[0] === 'test-sector') {
 
 if (args[0] === 'test-store') {
     api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.h5QDbjr-3cTI3Jnc4xczWvUBpK2-jTM65JOQGj2fnvA'; // qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.uxVEWd2TmAX498c4Fak9xmbR9ocXaiYwZuelf4_yluY'; // qabot2
 
     (async () => {
         try {
-            const minerInfo = StateMinerInfo('t02429');
+            //let miner = 't02041';
+            let miner = 't05548';
+            const minerInfo = await StateMinerInfo(miner);
+            const { PeerId } = minerInfo.result;
             console.log(minerInfo);
 
-            return;
-
-            const importData = await ClientImport('/root/import2.log')
+            const importData = await ClientImport('/root/import4.log')
             const { '/': dataCid } = importData.result;
             console.log(dataCid);
 
@@ -224,7 +234,7 @@ if (args[0] === 'test-store') {
 
             console.log(wallet);
 
-            const ask = await ClientQueryAsk('12D3KooWS13JZpyKA7t2awQAnawk4njgA6TYTevi5ocrHxnRGmFY', 't02429');
+            const ask = await ClientQueryAsk(PeerId, miner);
             console.log(ask);
 
             const epochPrice = '500000000';//'2600';
@@ -239,14 +249,14 @@ if (args[0] === 'test-store') {
                     PieceSize: 0
                 },
                 Wallet: wallet,
-                Miner: 't02429',
+                Miner: miner,
                 EpochPrice: epochPrice,
                 MinBlocksDuration: 10000
             }
 
             const dealData = await ClientStartDeal(dataRef);
             const { '/': proposalCid } = dealData.result;
-
+            console.log(dealData);
             console.log(proposalCid);
 
         } catch (e) {
@@ -254,8 +264,6 @@ if (args[0] === 'test-store') {
         }
 
     })();
-    
-
 }
 
 if (args[0] === 'test') {
@@ -297,4 +305,6 @@ module.exports = {
     ClientImport,
     ClientRetrieve,
     WalletDefaultAddress,
+    ClientStartDealCmd,
+    ClientRetrieveCmd,
 };
