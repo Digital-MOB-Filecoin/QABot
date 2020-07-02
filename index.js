@@ -284,8 +284,8 @@ async function StorageDeal(miner, cmdMode = false) {
       let dealCid;
 
       if (cmdMode) {
-        INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(askResponse.result.Ask.Price) + "10000");
-        var response = await lotus.ClientStartDeal(dataCid, miner, CalculateStorageDealPrice(askResponse.result.Ask.Price), '10000');
+        INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(askResponse.result.Ask.Price) + " 10000");
+        var response = await lotus.ClientStartDealCmd(dataCid, miner, CalculateStorageDealPrice(askResponse.result.Ask.Price), '10000');
         dealCid = RemoveLineBreaks(response);
       } else {
         const walletDefault = await lotus.WalletDefaultAddress();
