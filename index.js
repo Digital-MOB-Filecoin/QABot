@@ -258,7 +258,7 @@ async function StorageDeal(miner, cmdMode = false) {
     INFO("StateMinerInfo [" + miner + "] PeerId: " + peerId);
 
     const connectedness = await lotus.NetConnectedness(peerId);
-    INFO("NetConnectedness [" + miner + "] " + connectedness);
+    INFO("NetConnectedness [" + miner + "] " + JSON.stringify(connectedness));
 
     const askResponse = await lotus.ClientQueryAsk(peerId, miner);
     if (askResponse.error) {
