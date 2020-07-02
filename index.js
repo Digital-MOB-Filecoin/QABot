@@ -38,6 +38,7 @@ const args = require('args')
 args
   .option('standalone', 'Run the Bot standalone')
   .option('cmdMode', 'Use lotus commands')
+  .option('size', 'Test file size', FILE_SIZE_LARGE)
  
 const flags = args.parse(process.argv)
 
@@ -111,7 +112,7 @@ function RandomTestFilePath(basePath) {
 }
 
 function RandomTestFileSize() {
-  return FILE_SIZE_LARGE; //TODO: generate random size [FILE_SIZE_SMALL,FILE_SIZE_MEDIUM,FILE_SIZE_LARGE]
+  return flags.size;
 }
 
 function GenerateTestFile(filePath, size) {
