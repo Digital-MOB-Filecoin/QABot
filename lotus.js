@@ -94,6 +94,10 @@ function ClientStartDealCmd(dataCid, miner, price, duration) {
     return spawn('lotus', ["client", "deal", dataCid, miner, price, duration], null);
 }
 
+function NetConnectedness(peerId) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.NetConnectedness", "params": [peerId], "id": 0 }));
+}
+
 function ClientRetrieveCmd(dataCid, outFile) {
     return spawn('lotus', ["client", "retrieve", dataCid, outFile], null);
 }
@@ -114,6 +118,20 @@ if (args[0] === 'test-ip') {
     }).catch(error => {
         console.log(error);
     });
+}
+
+if (args[0] === 'test-online') {
+    api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.XCVQTyuuh8Qh0_KiQt8f2EuaiYj8UlZ9ns5q29acWAc';// qabot1
+
+    (async () => {
+        const {result} = await NetConnectedness('12D3KooWDgdHbJeoVbcGKkvFhB49mP5B2cq5vYuRGNnzSQHSpkhs');
+        console.log(result);
+        console.log("NetConnectedness " + ((result == 1) ? 'online' : 'offline'));
+        const response = await NetConnectedness('12D3KooWNc5J8V3HgMjS63E7zRCqXbfBrRzQp9Bs9oZ5WAPBfeAU');
+        console.log(response);
+        console.log("NetConnectedness " + ((response.result == 1) ? 'online' : 'offline'));
+    })();
 }
 
 if (args[0] === 'test-retrive') {
@@ -305,6 +323,7 @@ module.exports = {
     ClientImport,
     ClientRetrieve,
     WalletDefaultAddress,
+    NetConnectedness,
     ClientStartDealCmd,
     ClientRetrieveCmd,
 };
