@@ -584,8 +584,14 @@ function PrintStats() {
 const pause = (timeout) => new Promise(res => setTimeout(res, timeout));
 
 const mainLoop = async _ => {
-  while (!stop) {
+  if (flags.standalone) {
     await LoadMiners();
+  }
+
+  while (!stop) {
+    if (!flags.standalone) {
+      await LoadMiners();
+    }
     await RunStorageDeals();
     await CheckPendingStorageDeals();
     await RunRetriveDeals();
