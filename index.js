@@ -5,7 +5,7 @@ const isIPFS = require('is-ipfs');
 const config = require('./config');
 const timestamp = require('time-stamp');
 const perf = require('execution-time')();
-const { FormatBytes, DealTimeout, Timeout } = require('./utils');
+const { FormatBytes, DealTimeout, TimeDifferenceInHours, Timeout } = require('./utils');
 const { BackendClient } = require('./backend')
 const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
@@ -16,7 +16,7 @@ let stop = false;
 let topMinersList = new Array;
 let storageDealsMap = new Map();
 let retriveDealsMap = new Map();
-let minersDataStatsMap = new Map();
+let minersMap = new Map();
 
 let statsStorageDealsPending = 0;
 let statsStorageDealsSuccessful = 0;
@@ -24,12 +24,14 @@ let statsStorageDealsFailed = 0;
 let statsRetrieveDealsSuccessful = 0;
 let statsRetrieveDealsFailed = 0;
 
-const RETRIVING_ARRAY_MAX_SIZE = 1000000 //items
-const BUFFER_SIZE = 65536 //64KB
-const FILE_SIZE_SMALL = 104857600   //(100MB)
-const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
-const FILE_SIZE_LARGE = 5368709120  // (5GB)
+const RETRIVING_ARRAY_MAX_SIZE = 1000000; //items
+const BUFFER_SIZE = 65536; //64KB
+const FILE_SIZE_SMALL = 104857600;   //(100MB)
+const FILE_SIZE_MEDIUM = 1073741824;  //(1GB)
+const FILE_SIZE_LARGE = 5368709120;  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100;
+const MIN_DAILY_RATE = 10737418240; //10GB
+const MAX_DAILY_RATE = 268435456000; //250GB
 
 let backend;
 
@@ -323,6 +325,13 @@ async function StorageDeal(miner, cmdMode = false) {
 
       INFO("ClientStartDeal: " + dealCid);
 
+      if (minersMap.has(miner)) {
+        let minerData = minersMap.get(miner);
+        minerData.currentProposedDealsSize = minerData.currentProposedDealsSize + size;
+        minerData.totalProposedDealsSize = minerData.totalProposedDealsSize + size;
+        minersMap.set(pendingStorageDeal.miner, minerData);
+      }
+
       if (!storageDealsMap.has(dealCid)) {
         storageDealsMap.set(dealCid, {
           dataCid: dataCid,
@@ -448,6 +457,45 @@ function SHA256FileSync(path) {
   return hash.digest('hex')
 }
 
+async function CalculateMinersDailyRate() {
+  var it = 0;
+  while (!stop && (it < topMinersList.length)) {
+
+    if (minersMap.has(topMinersList[it].address)) {
+      let minerData = minersMap.get(topMinersList[it].address);
+      if (TimeDifferenceInHours(minerData.timestamp) >= 24) {
+        let dailyRate = (topMinersList[it].power - minerData.power) / 2;
+        if (dailyRate < MIN_DAILY_RATE) {
+          dailyRate = MIN_DAILY_RATE;
+        }
+        if (dailyRate > MAX_DAILY_RATE) {
+          dailyRate = MAX_DAILY_RATE;
+        }
+
+        minerData.dailyRate = dailyRate;
+        minerData.power = topMinersList[it].power;
+        minerData.currentProposedDealsSize = 0;
+        minerData.timestamp = Date.now();
+
+        minersMap.set((topMinersList[it].address, minerData);
+
+        INFO(`CalculateMinersDailyRate [${topMinersList[it].address}] dailyRate: ${FormatBytes(dailyRate)}`);
+      }
+    } else {
+      minersMap.set(topMinersList[it].address, {
+        dailyRate: MIN_DAILY_RATE,
+        power: topMinersList[it].power,
+        currentProposedDealsSize: 0,
+        totalProposedDealsSize: 0,
+        totalSuccessfulDealsSize: 0,
+        timestamp: Date.now()
+      });
+    }
+
+    it++;
+  }
+}
+
 async function RunQueryAsks() {
   let tmpMinersList = new Array;
 
@@ -512,8 +560,20 @@ async function RunStorageDeals() {
       break;
     }
 
-    await StorageDeal(topMinersList[it].address, flags.cmdMode);
-    await pause(1000);
+    let makeDeal = true;
+
+    if (minersMap.has(topMinersList[it].address)) {
+      let minerData = minersMap.get(topMinersList[it].address);
+      if (minerData.currentProposedDealsSize >= minerData.dailyRate) {
+        makeDeal = false;
+        INFO(`DailyRate reached [${topMinersList[it].address}] dailyRate: ${FormatBytes(minerData.dailyRate)}`);
+      }
+    }
+
+    if (makeDeal) {
+      await StorageDeal(topMinersList[it].address, flags.cmdMode);
+      await pause(1000);
+    }
     it++;
   }
 }
@@ -557,11 +617,10 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
           backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
 
-          if (minersDataStatsMap.has(pendingStorageDeal.miner)) {
-            const oldSize = minersDataStatsMap.get(pendingStorageDeal.miner);
-            minersDataStatsMap.set(pendingStorageDeal.miner, pendingStorageDeal.size + oldSize);
-          } else {
-            minersDataStatsMap.set(pendingStorageDeal.miner, pendingStorageDeal.size);
+          if (minersMap.has(pendingStorageDeal.miner)) {
+            let minerData = minersMap.get(pendingStorageDeal.miner);
+            minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
+            minersMap.set(pendingStorageDeal.miner, minerData);
           }
 
           storageDealsMap.delete(dealCid);
@@ -637,8 +696,10 @@ function PrintStats() {
   INFO("RetrieveDeals: SUCCESSFUL : " + statsRetrieveDealsSuccessful);
   INFO("RetrieveDeals: FAILED : " + statsRetrieveDealsFailed);
   INFO("***************************************")
-  for (const [key, value] of minersDataStatsMap.entries()) {
-    INFO(`[${key}] ${FormatBytes(value)}`);
+  for (const [key, value] of minersMap.entries()) {
+    if (value.totalProposedDealsSize > 0) {
+      INFO(`[${key}] dailyRate: ${FormatBytes(value.dailyRate)} power: ${FormatBytes(value.power)} proposed: ${FormatBytes(value.currentProposedDealsSize)} totalProposed: ${FormatBytes(value.totalProposedDealsSize)} totalSuccessful: ${FormatBytes(value.totalSuccessfulDealsSize)}`);
+    }
   }
   INFO("***************************************")
 }
@@ -654,6 +715,7 @@ const mainLoop = async _ => {
     if (!flags.standalone) {
       await LoadMiners();
     }
+    await CalculateMinersDailyRate();
     //await RunQueryAsks();
     await RunStorageDeals();
     await CheckPendingStorageDeals();

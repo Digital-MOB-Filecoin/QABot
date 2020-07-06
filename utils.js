@@ -15,6 +15,10 @@ function DealTimeout(timestamp) {
     return false;
 }
 
+function TimeDifferenceInHours(timestamp) {
+    return (Math.abs(Date.now() - timestamp) / (1000 * 3600)).toFixed();
+}
+
 function Timeout(seconds) {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
