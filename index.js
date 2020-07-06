@@ -329,7 +329,7 @@ async function StorageDeal(miner, cmdMode = false) {
         let minerData = minersMap.get(miner);
         minerData.currentProposedDealsSize = minerData.currentProposedDealsSize + size;
         minerData.totalProposedDealsSize = minerData.totalProposedDealsSize + size;
-        minersMap.set(pendingStorageDeal.miner, minerData);
+        minersMap.set(miner, minerData);
       }
 
       if (!storageDealsMap.has(dealCid)) {
