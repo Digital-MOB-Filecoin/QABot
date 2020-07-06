@@ -167,7 +167,10 @@ async function LoadMinersFromBackend() {
           if (miner.id && miner.power) {
             tmpMinersList.push({
               address: miner.id,
-              power: miner.power
+              peerId: '',
+              power: miner.power,
+              price: 0,
+              online: false
             })
           }
         });
@@ -206,7 +209,10 @@ async function LoadMinersLotusWs() {
         if (power.MinerPower.QualityAdjPower > 0) {
           topMinersList.push({
             address: miner,
-            power: power.MinerPower.QualityAdjPower
+            peerId: '',
+            power: power.MinerPower.QualityAdjPower,
+            price: 0,
+            online: false
           })
         }
       }));
@@ -364,7 +370,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
 
       if (cmdMode) {
         const timeoutPromise = Timeout(3600); // 1 hour lotus.ClientRetrieve timeout
-        const response = await Promise.race([lotus.ClientRetrieveCmd(retrievalOffer, outFile), timeoutPromise]);
+        const response = await Promise.race([lotus.ClientRetrieveCmd(dataCid, outFile), timeoutPromise]);
         data = RemoveLineBreaks(response);
       } else {
         data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
@@ -375,8 +381,8 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       if (data === 'timeout') {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " retrieve deal timeout");
       } else if (data.error) {
-        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " " + data.error);
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, data.error);
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " " + JSON.stringify(data.error));
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, JSON.stringify(data.error));
       } else {
         var hash = SHA256FileSync(outFile);
         INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
@@ -442,6 +448,62 @@ function SHA256FileSync(path) {
   return hash.digest('hex')
 }
 
+async function RunQueryAsks() {
+  let tmpMinersList = new Array;
+
+  var minersSlice = topMinersList;
+  while (minersSlice.length) {
+    await Promise.all(minersSlice.splice(0, 10).map(async (miner) => {
+      const minerInfo = await lotus.StateMinerInfo(miner.address);
+
+      let peerId;
+      let sectorSize = minerInfo.result.SectorSize;
+
+      if (isIPFS.multihash(minerInfo.result.PeerId)) {
+        peerId = minerInfo.result.PeerId;
+      } else {
+        const PeerId = require('peer-id');
+        const binPeerId = Buffer.from(minerInfo.result.PeerId, 'base64');
+        const strPeerId = PeerId.createFromBytes(binPeerId);
+
+        peerId = strPeerId.toB58String();
+      }
+
+      INFO("StateMinerInfo [" + miner.address + "] PeerId: " + peerId);
+
+      const askResponse = await lotus.ClientQueryAsk(peerId, miner.address);
+      if (askResponse.error) {
+        INFO("ClientQueryAsk : " + JSON.stringify(askResponse));
+        //FAILED -> send result to BE
+        FAILED('StoreDeal', miner.address, 'ClientQueryAsk failed : ' + askResponse.error.message);
+        backend.SaveStoreDeal(miner.address, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
+        statsStorageDealsFailed++;
+
+        tmpMinersList.push({
+          address: miner.address,
+          peerId: peerId,
+          power: miner.power,
+          price: 0,
+          online: false
+        })
+      } else {
+        tmpMinersList.push({
+          address: miner.address,
+          peerId: peerId,
+          power: miner.power,
+          price: askResponse.result.Ask.Price,
+          online: true
+        })
+      }
+    }));
+  }
+
+  if (tmpMinersList.length) {
+    topMinersList.length = 0;
+    topMinersList = [...tmpMinersList];
+  }
+}
+
 async function RunStorageDeals() {
   var it = 0;
   while (!stop && (it < topMinersList.length)) {
@@ -492,7 +554,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           }
 
           //PASSED -> send result to BE [dealcid;datacid;size]
-          PASSED('StoreDeal', pendingStorageDeal.miner, pendingStorageDeal.dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
+          PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
           backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
 
           if (minersDataStatsMap.has(pendingStorageDeal.miner)) {
@@ -592,6 +654,7 @@ const mainLoop = async _ => {
     if (!flags.standalone) {
       await LoadMiners();
     }
+    //await RunQueryAsks();
     await RunStorageDeals();
     await CheckPendingStorageDeals();
     await RunRetriveDeals();
