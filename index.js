@@ -477,7 +477,7 @@ async function CalculateMinersDailyRate() {
         minerData.currentProposedDealsSize = 0;
         minerData.timestamp = Date.now();
 
-        minersMap.set((topMinersList[it].address, minerData);
+        minersMap.set(topMinersList[it].address, minerData);
 
         INFO(`CalculateMinersDailyRate [${topMinersList[it].address}] dailyRate: ${FormatBytes(dailyRate)}`);
       }
