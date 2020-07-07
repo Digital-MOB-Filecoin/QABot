@@ -327,7 +327,9 @@ async function StorageDeal(miner, cmdMode = false) {
 
       if (minersMap.has(miner)) {
         let minerData = minersMap.get(miner);
+        minerData.currentProposedDeals++;
         minerData.currentProposedDealsSize = minerData.currentProposedDealsSize + size;
+        minerData.totalProposedDeals++;
         minerData.totalProposedDealsSize = minerData.totalProposedDealsSize + size;
         minersMap.set(miner, minerData);
       }
@@ -474,6 +476,7 @@ async function CalculateMinersDailyRate() {
 
         minerData.dailyRate = dailyRate;
         minerData.power = topMinersList[it].power;
+        minerData.currentProposedDeals = 0;
         minerData.currentProposedDealsSize = 0;
         minerData.timestamp = Date.now();
 
@@ -485,8 +488,11 @@ async function CalculateMinersDailyRate() {
       minersMap.set(topMinersList[it].address, {
         dailyRate: MIN_DAILY_RATE,
         power: topMinersList[it].power,
+        currentProposedDeals: 0,
         currentProposedDealsSize: 0,
+        totalProposedDeals: 0,
         totalProposedDealsSize: 0,
+        totalSuccessfulDeals: 0,
         totalSuccessfulDealsSize: 0,
         timestamp: Date.now()
       });
@@ -619,6 +625,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 
           if (minersMap.has(pendingStorageDeal.miner)) {
             let minerData = minersMap.get(pendingStorageDeal.miner);
+            minerData.totalSuccessfulDeals++;
             minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
             minersMap.set(pendingStorageDeal.miner, minerData);
           }
@@ -698,7 +705,12 @@ function PrintStats() {
   INFO("***************************************")
   for (const [key, value] of minersMap.entries()) {
     if (value.totalProposedDealsSize > 0) {
-      INFO(`[${key}] dailyRate: ${FormatBytes(value.dailyRate)} power: ${FormatBytes(value.power)} proposed: ${FormatBytes(value.currentProposedDealsSize)} totalProposed: ${FormatBytes(value.totalProposedDealsSize)} totalSuccessful: ${FormatBytes(value.totalSuccessfulDealsSize)}`);
+      INFO(`[${key}] 
+      dailyRate: ${FormatBytes(value.dailyRate)} 
+      power: ${FormatBytes(value.power)} 
+      proposed[${value.currentProposedDeals}]: ${FormatBytes(value.currentProposedDealsSize)} 
+      totalProposed[${value.totalProposedDeals}]: ${FormatBytes(value.totalProposedDealsSize)} 
+      totalSuccessful[${value.totalSuccessfulDeals}]: ${FormatBytes(value.totalSuccessfulDealsSize)}`);
     }
   }
   INFO("***************************************")
