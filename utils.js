@@ -30,5 +30,6 @@ function Timeout(seconds) {
 module.exports = {
     FormatBytes,
     DealTimeout,
+    TimeDifferenceInHours,
     Timeout,
 };
