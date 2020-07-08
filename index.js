@@ -1,6 +1,7 @@
 const fs = require('fs')
 const crypto = require('crypto')
-const lotus = require('./lotus');;
+const lotus = require('./lotus');
+const prometheus = require('./prometheus');
 const isIPFS = require('is-ipfs');
 const config = require('./config');
 const timestamp = require('time-stamp');
@@ -275,6 +276,7 @@ async function StorageDeal(miner, cmdMode = false) {
       FAILED('StoreDeal', miner, 'ClientQueryAsk failed : ' + askResponse.error.message);
       backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
       statsStorageDealsFailed++;
+      prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
     } else {
 
       //generate new file
@@ -403,6 +405,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
           backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
 
           statsRetrieveDealsSuccessful++;
+          prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
           DeleteTestFile(retrieveDeal.filePath);
           retriveDealsMap.delete(dataCid);
         } else {
@@ -411,6 +414,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
           backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
 
           statsRetrieveDealsFailed++;
+          prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
           DeleteTestFile(retrieveDeal.filePath);
           retriveDealsMap.delete(dataCid);
         }
@@ -532,6 +536,7 @@ async function RunQueryAsks() {
         FAILED('StoreDeal', miner.address, 'ClientQueryAsk failed : ' + askResponse.error.message);
         backend.SaveStoreDeal(miner.address, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
         statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
 
         tmpMinersList.push({
           address: miner.address,
@@ -606,8 +611,9 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
         if (dealStates[data.result.State] == "StorageDealActive") {
 
           statsStorageDealsSuccessful++;
+          prometheus.SetSuccessfulStorageDeals(statsStorageDealsSuccessful);
 
-          //DeleteTestFile(pendingStorageDeal.filePath); TODO
+          DeleteTestFile(pendingStorageDeal.filePath);
 
           if (!retriveDealsMap.has(pendingStorageDeal.dataCid)) {
             retriveDealsMap.set(pendingStorageDeal.dataCid, {
@@ -639,15 +645,16 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           storageDealsMap.delete(dealCid);
           DeleteTestFile(pendingStorageDeal.filePath);
         } else if (dealStates[data.result.State] == "StorageDealStaged") {
-          //DeleteTestFile(pendingStorageDeal.filePath); TODO
+          DeleteTestFile(pendingStorageDeal.filePath); 
         } else if (dealStates[data.result.State] == "StorageDealSealing") {
-          //DeleteTestFile(pendingStorageDeal.filePath); TODO
+          DeleteTestFile(pendingStorageDeal.filePath); 
         } else if (dealStates[data.result.State] == "StorageDealError") {
           //FAILED -> send result to BE
           FAILED('StoreDeal', pendingStorageDeal.miner, 'state StorageDealError');
           backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'state StorageDealError');
 
           statsStorageDealsFailed++;
+          prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
           DeleteTestFile(pendingStorageDeal.filePath);
           storageDealsMap.delete(dealCid);
         } else if (DealTimeout(pendingStorageDeal.timestamp)) {
@@ -657,6 +664,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 
           storageDealsMap.delete(dealCid);
           statsStorageDealsFailed++;
+          prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
           DeleteTestFile(pendingStorageDeal.filePath);
         }
 
@@ -674,6 +682,7 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
 
 async function CheckPendingStorageDeals() {
   statsStorageDealsPending = storageDealsMap.size;
+  prometheus.SetPendingStorageDeals(statsStorageDealsPending);
   for (const [key, value] of storageDealsMap.entries()) {
     if (stop)
      break;

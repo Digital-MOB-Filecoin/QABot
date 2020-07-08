@@ -12,5 +12,8 @@ module.exports = {
   lotus: {
     api: process.env.LOTUS_API || 'http://127.0.0.1:3999/rpc/v0',
     token: process.env.LOTUS_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.C0uuTLjRnMQth6J4jhs3FlA1kT9hprtPPxNYJYDaLY8',
+  },
+  prometheus: {
+    api: process.env.PUSHGATEWAY_API || 'http://127.0.0.1:9091',
   }
 };
