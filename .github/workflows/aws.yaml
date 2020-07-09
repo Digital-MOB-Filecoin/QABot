@@ -1,0 +1,54 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository code
+      uses: actions/checkout@v2
+
+    - name: Set version
+      id: vars
+      run: echo "::set-output name=version::$(echo ${GITHUB_SHA} | cut -c1-7)"
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build, tag and push the image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: filecoin/qabot
+        IMAGE_TAG: ${{ steps.vars.outputs.version }}
+      run: |
+        docker pull $ECR_REGISTRY/$ECR_REPOSITORY:latest || true
+        docker build \
+          --cache-from $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+          -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG} \
+          -t ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest \
+          ${GITHUB_WORKSPACE}
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:${IMAGE_TAG}
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+    - name: Echo IMAGE_TAG
+      env:
+        IMAGE_TAG: ${{ steps.vars.outputs.version }}
+      run: |
+        echo "Version to set in deployment manifests: ${IMAGE_TAG}"
+
+    - name: Logout from Amazon ECR
+      if: always()
+      run: |
+        docker logout ${{ steps.login-ecr.outputs.registry }}
