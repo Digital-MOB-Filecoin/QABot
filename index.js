@@ -291,8 +291,8 @@ async function StorageDeal(miner, cmdMode = false) {
       var fileHash = GenerateTestFile(filePath, size);
 
       const importData = await lotus.ClientImport(filePath);
-      const { '/': dataCid } = importData.result;
-      INFO("ClientImport : " + dataCid);
+      const { '/': dataCid } = importData.result.Root;
+      INFO("ClientImport : " + JSON.stringify(importData));
 
       let dealCid;
 
