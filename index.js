@@ -382,7 +382,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       let data;
 
       if (cmdMode) {
-        const timeoutPromise = Timeout(3600); // 1 hour lotus.ClientRetrieve timeout
+        const timeoutPromise = Timeout(12*3600); // 12 hour lotus.ClientRetrieve timeout
         const response = await Promise.race([lotus.ClientRetrieveCmd(dataCid, outFile), timeoutPromise]);
         data = RemoveLineBreaks(response);
       } else {

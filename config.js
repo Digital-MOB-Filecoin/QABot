@@ -10,7 +10,7 @@ module.exports = {
     token: process.env.BACKEND_TOKEN || 'eyJpZCI6Miwic2VydmljZV90b2tlbiI6IkRYMm5KbUJ0SGZTNFN5OXAifQ==',
   },
   lotus: {
-    api: process.env.LOTUS_API || 'http://127.0.0.1:1234/rpc/v0',
+    api: process.env.LOTUS_API || 'http://127.0.0.1:3999/rpc/v0',
     token: process.env.LOTUS_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.C0uuTLjRnMQth6J4jhs3FlA1kT9hprtPPxNYJYDaLY8',
   },
   prometheus: {
