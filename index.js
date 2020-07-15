@@ -392,17 +392,18 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       INFO(JSON.stringify(data));
 
       if (data === 'timeout') {
-        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " retrieve deal timeout");
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';timeout');
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';timeout');
       } else if (data.error) {
-        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " " + JSON.stringify(data.error));
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, JSON.stringify(data.error));
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';' + JSON.stringify(data.error));
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';' + JSON.stringify(data.error));
       } else {
         var hash = SHA256FileSync(outFile);
         INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
         if (hash == retrieveDeal.fileHash) {
           //PASSED -> send result to BE
-          PASSED('RetrieveDeal', retrieveDeal.miner, 'success outFile:' + outFile + 'sha256:' + hash);
-          backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
+          PASSED('RetrieveDeal', retrieveDeal.miner, dataCid + ';success outFile:' + outFile + 'sha256:' + hash);
+          backend.SaveRetrieveDeal(retrieveDeal.miner, true, dataCid + ';success');
 
           statsRetrieveDealsSuccessful++;
           prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
@@ -410,8 +411,8 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
           retriveDealsMap.delete(dataCid);
         } else {
           //FAILED -> send result to BE
-          FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
-          backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
+          FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
+          backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';hash check failed');
 
           statsRetrieveDealsFailed++;
           prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
@@ -650,8 +651,9 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           DeleteTestFile(pendingStorageDeal.filePath); 
         } else if (dealStates[data.result.State] == "StorageDealError") {
           //FAILED -> send result to BE
-          FAILED('StoreDeal', pendingStorageDeal.miner, 'state StorageDealError');
-          backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'state StorageDealError');
+
+          FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
+          backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
 
           statsStorageDealsFailed++;
           prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
@@ -659,8 +661,8 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           storageDealsMap.delete(dealCid);
         } else if (DealTimeout(pendingStorageDeal.timestamp)) {
           //FAILED -> send result to BE
-          FAILED('StoreDeal', pendingStorageDeal.miner, 'timeout in state: ' + dealStates[data.result.State]);
-          backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'timeout in state: ' + dealStates[data.result.State]);
+          FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
+          backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
 
           storageDealsMap.delete(dealCid);
           statsStorageDealsFailed++;
