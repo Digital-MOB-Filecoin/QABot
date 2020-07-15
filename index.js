@@ -35,6 +35,7 @@ const MIN_DAILY_RATE = 10737418240; //10GB
 const MAX_DAILY_RATE = 268435456000; //250GB
 
 let backend;
+let slcHeight;
 
 const args = require('args')
  
@@ -42,6 +43,7 @@ args
   .option('standalone', 'Run the Bot standalone')
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_LARGE)
+  .option('slcHeight', 'SLC start height')
  
 const flags = args.parse(process.argv)
 
@@ -49,6 +51,10 @@ if (flags.standalone) {
   backend = BackendClient.Shared(true);
 } else {
   backend = BackendClient.Shared(false);
+}
+
+if (flags.slcHeight) {
+  slcHeight = flags.slcHeight;
 }
 
 const dealStates = [
@@ -694,12 +700,84 @@ async function CheckPendingStorageDeals() {
   }
 }
 
-function SectorLifeCycle(miner) {
-
+function SLCRange(start, end) {
+  return Array(end - start + 1).fill().map((_, idx) => start + idx)
 }
 
-function RunSLCCheck() {
+async function RunSLCCheck() {
+  var cbor = require('cbor');
+  const result = [];
+  var chainHead = await lotus.ChainHead();
 
+  if (slcHeight === chainHead.result.Height) {
+    INFO(`RunSLCCheck: Height(${slcHeight}) already checked`);
+    return;
+  }
+
+  if (!slcHeight) {
+    slcHeight = chainHead.result.Height;
+    INFO(`RunSLCCheck: set slcHeight to chainHead Height(${chainHead.result.Height})`);
+  }
+
+  if (slcHeight > chainHead.result.Height) {
+    ERROR(`RunSLCCheck: slcHeight(${slcHeight}) > chainHead Height(${chainHead.result.Height})`);
+    return;
+  }
+
+  INFO("RunSLCCheck: chainHead " + chainHead.result.Height);
+
+  let blocks = SLCRange(slcHeight, chainHead.result.Height); // [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+  //let blocks = [...Array(chainHead.result.Height).keys()];
+
+  var blocksSlice = blocks;
+  while (blocksSlice.length) {
+    await Promise.all(blocksSlice.splice(0, 50).map(async (block) => {
+      try {
+        var selectedHeight = block;
+        var tipSet = (await lotus.ChainGetTipSetByHeight(selectedHeight, chainHead.result.Cids)).result;
+        if (tipSet.Blocks) {
+          for (const block of tipSet.Blocks) {
+            const level1Cid = block.Messages['/'];
+            if (level1Cid) {
+              const level2Cids = (await lotus.ChainGetNode(level1Cid)).result.Obj.map(obj => obj['/'])
+              for (const level2Cid of level2Cids) {
+                const messageCids = (await lotus.ChainGetNode(level2Cid)).result.Obj[2][2].map(obj => obj['/'])
+                for (const messageCid of messageCids) {
+                  const message = await lotus.ChainGetMessage({ '/': messageCid });
+                  if (message.result.Method === 6) {
+                    var decode = cbor.decode(Buffer.from(message.result.Params, 'base64'));
+                    if (decode[7] > 0) {
+                      result.push({
+                        height: tipSet.Height,
+                        miner: block.Miner,
+                        decode: decode,
+                        SectorNumber: decode[1],
+                        ReplaceCapacity: decode[6],
+                        ReplaceSector: decode[7],
+                        messageCid,
+                        ...message
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        ERROR('Error: ' + e.message);
+      }
+
+    }));
+
+    INFO("RunSLCCheck: Remainig blocks: " + blocksSlice.length + " found " + result.length);
+  }
+
+  result.forEach(element => {
+    INFO(element);
+  });
+
+  slcHeight = chainHead.result.Height;
 }
 
 function PrintStats() {
@@ -741,6 +819,7 @@ const mainLoop = async _ => {
     await CalculateMinersDailyRate();
     //await RunQueryAsks();
     await RunStorageDeals();
+    await RunSLCCheck();
     await CheckPendingStorageDeals();
     await RunRetriveDeals();
     await pause(2000);
