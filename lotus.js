@@ -102,7 +102,98 @@ function ClientRetrieveCmd(dataCid, outFile) {
     return spawn('lotus', ["client", "retrieve", dataCid, outFile], null);
 }
 
+function Version() {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.Version", "params": [], "id": 0 }));
+}
+
+function ChainHead() {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainHead", "params": [], "id": 0 }));
+}
+
+function ChainGetTipSetByHeight(selectedHeight, headTipSet) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetTipSetByHeight", "params": [selectedHeight, headTipSet], "id": 0 }));
+}
+
+function ChainGetTipSet(tipSetKey) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetTipSet", "params": [tipSetKey], "id": 0 }));
+}
+
+function ChainGetNode(nodeCid) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetNode", "params": [nodeCid], "id": 0 }));
+}
+
+function ChainGetMessage(messageCid) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetMessage", "params": [messageCid], "id": 0 }));
+}
+
 var args = process.argv.slice(2);
+
+if (args[0] === 'test-slc') {
+    var cbor = require('cbor');
+
+    api = 'http://104.248.116.108:1234/rpc/v0'; // qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.b4J6r2hB4FTgHicCUEJZhZzDn9et3Zhqwh8DiNkgxcQ';// qabot2
+
+    (async () => {
+        const result = [];
+        var version = await Version();
+        var chainHead = await ChainHead();
+
+        console.log("version: " + version.result.Version);
+        console.log(" chainHead.result.Cids: " + JSON.stringify(chainHead.result.Cids));
+
+        let blocks = [...Array(chainHead.result.Height).keys()];
+
+        var blocksSlice = blocks;
+        while (blocksSlice.length) {
+            await Promise.all(blocksSlice.splice(0, 50).map(async (block) => {
+                try {
+                    var selectedHeight = block;
+                    var tipSet = (await ChainGetTipSetByHeight(selectedHeight, chainHead.result.Cids)).result;
+                    if (tipSet.Blocks) {
+                        for (const block of tipSet.Blocks) {
+                            const level1Cid = block.Messages['/'];
+                            if (level1Cid) {
+                                const level2Cids = (await ChainGetNode(level1Cid)).result.Obj.map(obj => obj['/'])
+                                for (const level2Cid of level2Cids) {
+                                    const messageCids = (await ChainGetNode(level2Cid)).result.Obj[2][2].map(obj => obj['/'])
+                                    for (const messageCid of messageCids) {
+                                        const message = await ChainGetMessage({ '/': messageCid });
+                                        if (message.result.Method === 6) {
+                                            var decode = cbor.decode(Buffer.from(message.result.Params, 'base64'));
+                                            if (decode[7] > 0) {
+                                                result.push({
+                                                    height: tipSet.Height,
+                                                    miner: block.Miner,
+                                                    decode: decode,
+                                                    SectorNumber: decode[1],
+                                                    ReplaceCapacity: decode[6],
+                                                    ReplaceSector: decode[7],
+                                                    messageCid,
+                                                    ...message
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.log('Error: ' + e.message);
+                }
+
+            }));
+
+            console.log("Remainig blocks: " + blocksSlice.length + " " + result.length);
+        }
+
+        result.forEach(element => {
+                console.log(element)
+        });
+
+    })();
+}
 
 if (args[0] === 'test-ip') {
     api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
@@ -326,4 +417,10 @@ module.exports = {
     NetConnectedness,
     ClientStartDealCmd,
     ClientRetrieveCmd,
+    Version,
+    ChainHead,
+    ChainGetTipSetByHeight,
+    ChainGetTipSet,
+    ChainGetNode,
+    ChainGetMessage,
 };
