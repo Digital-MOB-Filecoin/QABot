@@ -303,8 +303,8 @@ async function StorageDeal(miner, cmdMode = false) {
       let dealCid;
 
       if (cmdMode) {
-        INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(askResponse.result.Ask.Price) + " 10000");
-        var response = await lotus.ClientStartDealCmd(dataCid, miner, CalculateStorageDealPrice(askResponse.result.Ask.Price), '10000');
+        INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(askResponse.result.Ask.Price) + " 30000");
+        var response = await lotus.ClientStartDealCmd(dataCid, miner, CalculateStorageDealPrice(askResponse.result.Ask.Price), '30000');
         dealCid = RemoveLineBreaks(response);
       } else {
         const walletDefault = await lotus.WalletDefaultAddress();
@@ -323,7 +323,7 @@ async function StorageDeal(miner, cmdMode = false) {
           Wallet: wallet,
           Miner: miner,
           EpochPrice: epochPrice,
-          MinBlocksDuration: 10000
+          MinBlocksDuration: 30000
         }
 
         const dealData = await lotus.ClientStartDeal(dataRef);
@@ -649,8 +649,19 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
             retriveDealsMap.delete(pendingStorageDeal.dataCid);
           }
 
-          storageDealsMap.delete(dealCid);
+          //PASSED -> send result to BE [dealcid;datacid;size]
+          PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
+          backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+
+          if (minersMap.has(pendingStorageDeal.miner)) {
+            let minerData = minersMap.get(pendingStorageDeal.miner);
+            minerData.totalSuccessfulDeals++;
+            minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
+            minersMap.set(pendingStorageDeal.miner, minerData);
+          }
+
           DeleteTestFile(pendingStorageDeal.filePath);
+          storageDealsMap.delete(dealCid);
         } else if (dealStates[data.result.State] == "StorageDealStaged") {
           DeleteTestFile(pendingStorageDeal.filePath); 
         } else if (dealStates[data.result.State] == "StorageDealSealing") {
@@ -670,10 +681,10 @@ function StorageDealStatus(dealCid, pendingStorageDeal) {
           FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
           backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
 
-          storageDealsMap.delete(dealCid);
           statsStorageDealsFailed++;
           prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
           DeleteTestFile(pendingStorageDeal.filePath);
+          storageDealsMap.delete(dealCid);
         }
 
         resolve(true);
