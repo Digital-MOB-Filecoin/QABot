@@ -758,6 +758,7 @@ async function RunSLCCheck() {
                   if (message.result.Method === 6) {
                     var decode = cbor.decode(Buffer.from(message.result.Params, 'base64'));
                     if (decode[7] > 0) {
+                      backend.SaveSLC(block.Miner, true, message.result.Params);
                       result.push({
                         height: tipSet.Height,
                         miner: block.Miner,

@@ -52,6 +52,26 @@ class BackendClient {
             })
     }
 
+    SaveSLC(miner_id, success, message) {
+        if (this.dummyMode)
+            return Promise.resolve('dummy');
+
+        const MAX_LENGTH = 500;
+        var trimmedMessage = message.length > MAX_LENGTH ?
+            message.substring(0, MAX_LENGTH - 3) + "..." :
+            message;
+
+        const axios = require('axios');
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${config.backend.token}` }
+
+        return axios.post(config.backend.api + 'miner/slc',
+            {
+                miner_id: miner_id,
+                success: success,
+                message: trimmedMessage,
+            })
+    }
+
     SaveStoreDeal(miner_id, success, message) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
@@ -86,6 +106,13 @@ if (args[0] === 'test') {
     });
 
     backend.SaveRetrieveDeal('t01891', false, 'test').then(response => {
+        console.log(response.data);
+        console.log(response.status);
+    }).catch(error => {
+        console.log(error);
+    });
+
+    backend.SaveSLC('t0121507', false, 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
