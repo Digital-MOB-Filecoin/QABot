@@ -586,8 +586,7 @@ async function RunRetriveDeals() {
     if (stop)
      break;
 
-    await RetrieveDeal(key, value, flags.cmdMode);
-    await pause(1000);
+    RetrieveDeal(key, value, flags.cmdMode);
   }
 }
 
