@@ -17,6 +17,7 @@ let stop = false;
 let topMinersList = new Array;
 let storageDealsMap = new Map();
 let retriveDealsMap = new Map();
+let pendingRetriveDealsMap = new Map();
 let minersMap = new Map();
 
 let statsStorageDealsPending = 0;
@@ -367,11 +368,15 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         MinerPeerID: o.MinerPeerID
       }
 
-      const timeoutPromise = Timeout(3600); // 1 hour lotus.ClientRetrieve timeout
+      const timeoutPromise = Timeout(12*3600); // 12 hour lotus.ClientRetrieve timeout
       let data;
 
+      pendingRetriveDealsMap.set(dataCid, {
+        miner: retrieveDeal.miner,
+        timestamp: Date.now()
+      })
+
       if (cmdMode) {
-        const timeoutPromise = Timeout(12*3600); // 12 hour lotus.ClientRetrieve timeout
         const response = await Promise.race([lotus.ClientRetrieveCmd(dataCid, outFile), timeoutPromise]);
         data = RemoveLineBreaks(response);
       } else {
@@ -379,6 +384,8 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       }
 
       INFO(JSON.stringify(data));
+
+      pendingRetriveDealsMap.delete(dataCid);
 
       if (data === 'timeout') {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';timeout');
@@ -411,6 +418,9 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       }
     } else {
       ERROR("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
+      //FAILED -> send result to BE
+      FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';ClientFindData failed:' + JSON.stringify(findData));
+      backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';ClientFindData failed:' + JSON.stringify(findData));
     }
   } catch (e) {
     ERROR('Error: ' + e.message);
@@ -502,49 +512,53 @@ async function RunQueryAsks() {
   var minersSlice = topMinersList;
   while (minersSlice.length) {
     await Promise.all(minersSlice.splice(0, 50).map(async (miner) => {
-      const minerInfo = await lotus.StateMinerInfo(miner.address);
+      try {
+        const minerInfo = await lotus.StateMinerInfo(miner.address);
 
-      let peerId;
-      let sectorSize = minerInfo.result.SectorSize;
+        let peerId;
+        let sectorSize = minerInfo.result.SectorSize;
 
-      if (isIPFS.multihash(minerInfo.result.PeerId)) {
-        peerId = minerInfo.result.PeerId;
-      } else {
-        const PeerId = require('peer-id');
-        const binPeerId = Buffer.from(minerInfo.result.PeerId, 'base64');
-        const strPeerId = PeerId.createFromBytes(binPeerId);
+        if (isIPFS.multihash(minerInfo.result.PeerId)) {
+          peerId = minerInfo.result.PeerId;
+        } else {
+          const PeerId = require('peer-id');
+          const binPeerId = Buffer.from(minerInfo.result.PeerId, 'base64');
+          const strPeerId = PeerId.createFromBytes(binPeerId);
 
-        peerId = strPeerId.toB58String();
-      }
+          peerId = strPeerId.toB58String();
+        }
 
-      INFO("StateMinerInfo [" + miner.address + "] PeerId: " + peerId);
+        INFO("StateMinerInfo [" + miner.address + "] PeerId: " + peerId);
 
-      const askResponse = await lotus.ClientQueryAsk(peerId, miner.address);
-      if (askResponse.error) {
-        INFO("ClientQueryAsk : " + JSON.stringify(askResponse));
-        //FAILED -> send result to BE
-        FAILED('StoreDeal', miner.address, 'ClientQueryAsk failed : ' + askResponse.error.message);
-        backend.SaveStoreDeal(miner.address, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
-        statsStorageDealsFailed++;
-        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        const askResponse = await lotus.ClientQueryAsk(peerId, miner.address);
+        if (askResponse.error) {
+          INFO("ClientQueryAsk : " + JSON.stringify(askResponse));
+          //FAILED -> send result to BE
+          FAILED('StoreDeal', miner.address, 'ClientQueryAsk failed : ' + askResponse.error.message);
+          backend.SaveStoreDeal(miner.address, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
+          statsStorageDealsFailed++;
+          prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
 
-        tmpMinersList.push({
-          address: miner.address,
-          peerId: peerId,
-          power: miner.power,
-          price: 0,
-          sectorSize: sectorSize,
-          online: false
-        })
-      } else {
-        tmpMinersList.push({
-          address: miner.address,
-          peerId: peerId,
-          power: miner.power,
-          price: askResponse.result.Ask.Price,
-          sectorSize: sectorSize,
-          online: true
-        })
+          tmpMinersList.push({
+            address: miner.address,
+            peerId: peerId,
+            power: miner.power,
+            price: 0,
+            sectorSize: sectorSize,
+            online: false
+          })
+        } else {
+          tmpMinersList.push({
+            address: miner.address,
+            peerId: peerId,
+            power: miner.power,
+            price: askResponse.result.Ask.Price,
+            sectorSize: sectorSize,
+            online: true
+          })
+        }
+      } catch (e) {
+        ERROR('Error: ' + e.message);
       }
     }));
   }
@@ -586,101 +600,101 @@ async function RunRetriveDeals() {
     if (stop)
      break;
 
-    RetrieveDeal(key, value, flags.cmdMode);
+    if (!pendingRetriveDealsMap.has(key)) {
+      RetrieveDeal(key, value, flags.cmdMode);
+    }
   }
 }
 
 function StorageDealStatus(dealCid, pendingStorageDeal) {
-  return new Promise(function (resolve, reject) {
-    lotus.ClientGetDealInfo(dealCid).then(data => {
-      if (data && data.result && data.result.State) {
+  try {
+    var data = await lotus.ClientGetDealInfo(dealCid);
+    if (data && data.result && data.result.State) {
 
-        INFO("ClientGetDealInfo [" + dealCid + "] State: " + dealStates[data.result.State] + " dataCid: " + pendingStorageDeal.dataCid);
-        INFO("ClientGetDealInfo: " + JSON.stringify(data));
+      INFO("ClientGetDealInfo [" + dealCid + "] State: " + dealStates[data.result.State] + " dataCid: " + pendingStorageDeal.dataCid);
+      INFO("ClientGetDealInfo: " + JSON.stringify(data));
 
 
-        if (dealStates[data.result.State] == "StorageDealActive") {
+      if (dealStates[data.result.State] == "StorageDealActive") {
 
-          statsStorageDealsSuccessful++;
-          prometheus.SetSuccessfulStorageDeals(statsStorageDealsSuccessful);
+        statsStorageDealsSuccessful++;
+        prometheus.SetSuccessfulStorageDeals(statsStorageDealsSuccessful);
 
-          DeleteTestFile(pendingStorageDeal.filePath);
+        DeleteTestFile(pendingStorageDeal.filePath);
 
-          if (!retriveDealsMap.has(pendingStorageDeal.dataCid)) {
-            retriveDealsMap.set(pendingStorageDeal.dataCid, {
-              miner: pendingStorageDeal.miner,
-              filePath: pendingStorageDeal.filePath,
-              fileHash: pendingStorageDeal.fileHash,
-              size: pendingStorageDeal.size,
-              timestamp: Date.now()
-            })
-          }
-
-          //PASSED -> send result to BE [dealcid;datacid;size]
-          PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
-          backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
-
-          if (minersMap.has(pendingStorageDeal.miner)) {
-            let minerData = minersMap.get(pendingStorageDeal.miner);
-            minerData.totalSuccessfulDeals++;
-            minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
-            minersMap.set(pendingStorageDeal.miner, minerData);
-          }
-
-          storageDealsMap.delete(dealCid);
-        } else if (dealStates[data.result.State] == "StorageDealCompleted") {
-          if (retriveDealsMap.has(pendingStorageDeal.dataCid)) {
-            retriveDealsMap.delete(pendingStorageDeal.dataCid);
-          }
-
-          //PASSED -> send result to BE [dealcid;datacid;size]
-          PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
-          backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
-
-          if (minersMap.has(pendingStorageDeal.miner)) {
-            let minerData = minersMap.get(pendingStorageDeal.miner);
-            minerData.totalSuccessfulDeals++;
-            minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
-            minersMap.set(pendingStorageDeal.miner, minerData);
-          }
-
-          DeleteTestFile(pendingStorageDeal.filePath);
-          storageDealsMap.delete(dealCid);
-        } else if (dealStates[data.result.State] == "StorageDealStaged") {
-          DeleteTestFile(pendingStorageDeal.filePath); 
-        } else if (dealStates[data.result.State] == "StorageDealSealing") {
-          DeleteTestFile(pendingStorageDeal.filePath); 
-        } else if (dealStates[data.result.State] == "StorageDealError") {
-          //FAILED -> send result to BE
-
-          FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
-          backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
-
-          statsStorageDealsFailed++;
-          prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
-          DeleteTestFile(pendingStorageDeal.filePath);
-          storageDealsMap.delete(dealCid);
-        } else if (DealTimeout(pendingStorageDeal.timestamp)) {
-          //FAILED -> send result to BE
-          FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
-          backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
-
-          statsStorageDealsFailed++;
-          prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
-          DeleteTestFile(pendingStorageDeal.filePath);
-          storageDealsMap.delete(dealCid);
+        if (!retriveDealsMap.has(pendingStorageDeal.dataCid)) {
+          retriveDealsMap.set(pendingStorageDeal.dataCid, {
+            miner: pendingStorageDeal.miner,
+            filePath: pendingStorageDeal.filePath,
+            fileHash: pendingStorageDeal.fileHash,
+            size: pendingStorageDeal.size,
+            timestamp: Date.now()
+          })
         }
 
-        resolve(true);
-      } else {
-        WARNING("ClientGetDealInfo: " + JSON.stringify(data));
-        resolve(false);
+        //PASSED -> send result to BE [dealcid;datacid;size]
+        PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
+        backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+
+        if (minersMap.has(pendingStorageDeal.miner)) {
+          let minerData = minersMap.get(pendingStorageDeal.miner);
+          minerData.totalSuccessfulDeals++;
+          minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
+          minersMap.set(pendingStorageDeal.miner, minerData);
+        }
+
+        storageDealsMap.delete(dealCid);
+      } else if (dealStates[data.result.State] == "StorageDealCompleted") {
+        if (retriveDealsMap.has(pendingStorageDeal.dataCid)) {
+          retriveDealsMap.delete(pendingStorageDeal.dataCid);
+        }
+
+        //PASSED -> send result to BE [dealcid;datacid;size]
+        PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
+        backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+
+        if (minersMap.has(pendingStorageDeal.miner)) {
+          let minerData = minersMap.get(pendingStorageDeal.miner);
+          minerData.totalSuccessfulDeals++;
+          minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
+          minersMap.set(pendingStorageDeal.miner, minerData);
+        }
+
+        DeleteTestFile(pendingStorageDeal.filePath);
+        storageDealsMap.delete(dealCid);
+      } else if (dealStates[data.result.State] == "StorageDealStaged") {
+        DeleteTestFile(pendingStorageDeal.filePath);
+      } else if (dealStates[data.result.State] == "StorageDealSealing") {
+        DeleteTestFile(pendingStorageDeal.filePath);
+      } else if (dealStates[data.result.State] == "StorageDealError") {
+        //FAILED -> send result to BE
+
+        FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
+        backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
+
+        statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        DeleteTestFile(pendingStorageDeal.filePath);
+        storageDealsMap.delete(dealCid);
+      } else if (DealTimeout(pendingStorageDeal.timestamp)) {
+        //FAILED -> send result to BE
+        FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
+        backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
+
+        statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        DeleteTestFile(pendingStorageDeal.filePath);
+        storageDealsMap.delete(dealCid);
       }
-    }).catch(error => {
-      ERROR(error);
+
+      resolve(true);
+    } else {
+      WARNING("ClientGetDealInfo: " + JSON.stringify(data));
       resolve(false);
-    });
-  })
+    }
+  } catch (e) {
+    ERROR('Error: ' + e.message);
+  }
 }
 
 async function CheckPendingStorageDeals() {
@@ -702,7 +716,13 @@ function SLCRange(start, end) {
 async function RunSLCCheck() {
   var cbor = require('cbor');
   const result = [];
-  var chainHead = await lotus.ChainHead();
+  var chainHead;
+
+  try {
+    chainHead = await lotus.ChainHead();
+  } catch (e) {
+    ERROR('Error: ' + e.message);
+  }
 
   if (slcHeight === chainHead.result.Height) {
     INFO(`RunSLCCheck: Height(${slcHeight}) already checked`);
@@ -787,7 +807,11 @@ function PrintStats() {
   INFO("RetrieveDeals: TOTAL : " + (statsRetrieveDealsSuccessful + statsRetrieveDealsFailed));
   INFO("RetrieveDeals: SUCCESSFUL : " + statsRetrieveDealsSuccessful);
   INFO("RetrieveDeals: FAILED : " + statsRetrieveDealsFailed);
-  INFO("***************************************")
+  INFO("***************************************");
+  for (const [key, value] of retriveDealsMap.entries()) {
+    INFO(`Retrieval Deal ${key} ${value.miner} ${value.timestamp.toLocaleString()}`);
+  }
+  INFO("***************************************");
   for (const [key, value] of minersMap.entries()) {
     if (value.totalProposedDealsSize > 0) {
       INFO(`[${key}] 
@@ -798,7 +822,7 @@ function PrintStats() {
       totalSuccessful[${value.totalSuccessfulDeals}]: ${FormatBytes(value.totalSuccessfulDealsSize)}`);
     }
   }
-  INFO("***************************************")
+  INFO("***************************************");
 }
 
 const pause = (timeout) => new Promise(res => setTimeout(res, timeout));
