@@ -44,6 +44,7 @@ args
   .option('standalone', 'Run the Bot standalone')
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_LARGE)
+  .option('slc', 'Enable/Disable slc', true)
   .option('slcHeight', 'SLC start height')
  
 const flags = args.parse(process.argv)
@@ -686,11 +687,8 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
         DeleteTestFile(pendingStorageDeal.filePath);
         storageDealsMap.delete(dealCid);
       }
-
-      resolve(true);
     } else {
       WARNING("ClientGetDealInfo: " + JSON.stringify(data));
-      resolve(false);
     }
   } catch (e) {
     ERROR('Error: ' + e.message);
@@ -839,7 +837,9 @@ const mainLoop = async _ => {
     await CalculateMinersDailyRate();
     await RunQueryAsks();
     await RunStorageDeals();
-    await RunSLCCheck();
+    if (flags.slc) {
+      await RunSLCCheck();
+    }
     await CheckPendingStorageDeals();
     await RunRetriveDeals();
     await pause(2000);
