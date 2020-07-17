@@ -606,7 +606,7 @@ async function RunRetriveDeals() {
   }
 }
 
-function StorageDealStatus(dealCid, pendingStorageDeal) {
+async function StorageDealStatus(dealCid, pendingStorageDeal) {
   try {
     var data = await lotus.ClientGetDealInfo(dealCid);
     if (data && data.result && data.result.State) {
