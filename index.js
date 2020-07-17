@@ -31,7 +31,7 @@ const BUFFER_SIZE = 65536; //64KB
 const FILE_SIZE_SMALL = 104857600;   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824;  //(1GB)
 const FILE_SIZE_LARGE = 5368709120;  // (5GB)
-const MAX_PENDING_STORAGE_DEALS = 1000000;
+const MAX_PENDING_STORAGE_DEALS = 100;
 const MIN_DAILY_RATE = 10737418240; //10GB
 const MAX_DAILY_RATE = 268435456000; //250GB
 
@@ -278,10 +278,15 @@ async function StorageDeal(minerData, cmdMode = false) {
     let parseImportData;
     const importData = await lotus.ClientImport(filePath);
 
-    if (importData.result.Root) {
+    if (importData && importData.result && importData.result.Root) {
       parseImportData = importData.result.Root;
-    } else {
+    } else if (importData && importData.result) {
       parseImportData = importData.result;
+    }
+
+    if (!parseImportData) {
+      ERROR('ClientImport failed: ' + filePath);
+      DeleteTestFile(filePath);
     }
 
     const { '/': dataCid } = parseImportData;
