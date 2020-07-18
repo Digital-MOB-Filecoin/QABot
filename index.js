@@ -1,11 +1,15 @@
 const fs = require('fs')
 const crypto = require('crypto')
 const lotus = require('./lotus');
-const backend = require('./backend');
+const prometheus = require('./prometheus');
 const isIPFS = require('is-ipfs');
 const config = require('./config');
+const timestamp = require('time-stamp');
+const perf = require('execution-time')();
+const { FormatBytes, DealTimeout, TimeDifferenceInHours, Timeout } = require('./utils');
+const { BackendClient } = require('./backend')
+const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
-
 
 var uniqueFilename = require('unique-filename')
 
@@ -13,6 +17,8 @@ let stop = false;
 let topMinersList = new Array;
 let storageDealsMap = new Map();
 let retriveDealsMap = new Map();
+let pendingRetriveDealsMap = new Map();
+let minersMap = new Map();
 
 let statsStorageDealsPending = 0;
 let statsStorageDealsSuccessful = 0;
@@ -20,12 +26,38 @@ let statsStorageDealsFailed = 0;
 let statsRetrieveDealsSuccessful = 0;
 let statsRetrieveDealsFailed = 0;
 
-const RETRIVING_ARRAY_MAX_SIZE = 1000000 //items
-const BUFFER_SIZE = 65536 //64KB
-const FILE_SIZE_SMALL = 104857600   //(100MB)
-const FILE_SIZE_MEDIUM = 1073741824  //(1GB)
-const FILE_SIZE_LARGE = 5368709120  // (5GB)
+const RETRIVING_ARRAY_MAX_SIZE = 1000000; //items
+const BUFFER_SIZE = 65536; //64KB
+const FILE_SIZE_SMALL = 104857600;   //(100MB)
+const FILE_SIZE_MEDIUM = 1073741824;  //(1GB)
+const FILE_SIZE_LARGE = 5368709120;  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100;
+const MIN_DAILY_RATE = 10737418240; //10GB
+const MAX_DAILY_RATE = 268435456000; //250GB
+
+let backend;
+let slcHeight;
+
+const args = require('args')
+ 
+args
+  .option('standalone', 'Run the Bot standalone')
+  .option('cmdMode', 'Use lotus commands')
+  .option('size', 'Test file size', FILE_SIZE_LARGE)
+  .option('slc', 'Enable/Disable slc', true)
+  .option('slcHeight', 'SLC start height')
+ 
+const flags = args.parse(process.argv)
+
+if (flags.standalone) {
+  backend = BackendClient.Shared(true);
+} else {
+  backend = BackendClient.Shared(false);
+}
+
+if (flags.slcHeight) {
+  slcHeight = flags.slcHeight;
+}
 
 const dealStates = [
   'StorageDealUnknown',
@@ -56,29 +88,29 @@ const dealStates = [
 ]
 
 function INFO(msg) {
-  console.log('\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
 }
 
 function ERROR(msg) {
-  console.log('\x1b[31m', '[ ERROR  ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[31m', '[ ERROR  ] ', '\x1b[0m', msg);
 }
 
 function WARNING(msg) {
-  console.log('\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
 }
 
 function PASSED(type, miner, msg) {
   const util = require('util');
 
   let line = util.format('[%s][%s] %s', type, miner, msg);
-  console.log('\x1b[36m', '[ PASSED ] ', '\x1b[0m', line);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[36m', '[ PASSED ] ', '\x1b[0m', line);
 }
 
 function FAILED(type, miner, msg) {
   const util = require('util');
 
   let line = util.format('[%s][%s] %s', type, miner, msg);
-  console.log('\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
+  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
 }
 
 function RemoveLineBreaks(data) {
@@ -91,14 +123,14 @@ function RandomTestFilePath(basePath) {
 }
 
 function RandomTestFileSize() {
-  return FILE_SIZE_LARGE; //TODO: generate random size [FILE_SIZE_SMALL,FILE_SIZE_MEDIUM,FILE_SIZE_LARGE]
+  return flags.size;
 }
 
 function GenerateTestFile(filePath, size) {
   const fd = fs.openSync(filePath, 'w');
   const hash = crypto.createHash('sha256');
 
-  var start = new Date();
+  perf.start('GenerateTestFile');
 
   try {
     for (i = 0; i < size / BUFFER_SIZE; i++) {
@@ -112,10 +144,10 @@ function GenerateTestFile(filePath, size) {
   }
 
   var testFileHash = hash.digest('hex');
-  var end = new Date() - start;
 
-  INFO(`GenerateTestFile: ${filePath} size: ${size} sha256: ${testFileHash}`);
-  console.log('GenerateTestFile Execution time: %dms', end);
+  const results = perf.stop('GenerateTestFile');
+
+  INFO(`GenerateTestFile: Execution time: ${results.time} ${filePath} size: ${FormatBytes(size)} sha256: ${testFileHash}`);
 
   return testFileHash;
 }
@@ -131,7 +163,7 @@ function DeleteTestFile(filename) {
   }
 }
 
-async function LoadMiners() {
+async function LoadMinersFromBackend() {
   let tmpMinersList = new Array;
   let bBreak = false;
   let count = 0;
@@ -146,7 +178,11 @@ async function LoadMiners() {
           if (miner.id && miner.power) {
             tmpMinersList.push({
               address: miner.id,
-              power: miner.power
+              peerId: '',
+              power: miner.power,
+              price: 0,
+              sectorSize: 0,
+              online: false
             })
           }
         });
@@ -172,6 +208,46 @@ async function LoadMiners() {
   INFO("topMinersList: " + topMinersList.length);
 }
 
+async function LoadMinersLotusWs() {
+  const lotusWsClient = LotusWsClient.Shared();
+
+  try {
+    const miners = await lotusWsClient.StateListMiners();
+
+    var minersSlice = miners;
+    while (minersSlice.length) {
+      await Promise.all(minersSlice.splice(0, 50).map(async (miner) => {
+        const power = await lotusWsClient.StateMinerPower(miner);
+        if (power.MinerPower.QualityAdjPower > 0) {
+          topMinersList.push({
+            address: miner,
+            peerId: '',
+            power: power.MinerPower.QualityAdjPower,
+            price: 0,
+            sectorSize: 0,
+            online: false
+          })
+        }
+      }));
+    }
+
+    lotusWsClient.Close();
+
+    INFO("LoadMinersLotusWs topMinersList: " + topMinersList.length);
+
+  } catch (e) {
+    console.log('Error: ' + e.message);
+  }
+}
+
+async function LoadMiners() {
+  if (flags.standalone) {
+    return await LoadMinersLotusWs();
+  } else {
+    return await LoadMinersFromBackend();
+  }
+}
+
 function CalculateStorageDealPrice(askPrice) {
   const BigNumber = require('bignumber.js');
 
@@ -180,54 +256,53 @@ function CalculateStorageDealPrice(askPrice) {
   return x.dividedBy(y).toString(10);
 }
 
-async function StorageDeal(miner) {
-  INFO("StorageDeal [" + miner + "]");
+async function StorageDeal(minerData, cmdMode = false) {
   try {
-    const minerInfo = await lotus.StateMinerInfo(miner);
+    let miner = minerData.address;
+    let sectorSize = minerData.sectorSize;
+    let peerId = minerData.peerId;
 
-    let peerId;
-    let sectorSize = minerInfo.result.SectorSize;
+    INFO("StorageDeal [" + miner + "]");
 
-    if (isIPFS.multihash(minerInfo.result.PeerId)) {
-      peerId = minerInfo.result.PeerId;
-    } else {
-      const PeerId = require('peer-id');
-      const binPeerId = Buffer.from(minerInfo.result.PeerId, 'base64');
-      const strPeerId = PeerId.createFromBytes(binPeerId);
+    //generate new file
+    var filePath = RandomTestFilePath(config.bot.import);
+    var size = RandomTestFileSize();
 
-      peerId = strPeerId.toB58String();
+    if (size > sectorSize) {
+      ERROR(`GenerateTestFile size: ${FormatBytes(size)} > SectorSize: ${FormatBytes(sectorSize)}`);
+      size = sectorSize / 2; // TODO remove
     }
 
-    INFO("StateMinerInfo [" + miner + "] PeerId: " + peerId);
+    var fileHash = GenerateTestFile(filePath, size);
 
-    const askResponse = await lotus.ClientQueryAsk(peerId, miner);
-    if (askResponse.error) {
-      INFO("ClientQueryAsk : " + JSON.stringify(askResponse));
-      //FAILED -> send result to BE
-      FAILED('StoreDeal', miner, 'ClientQueryAsk failed : ' + askResponse.error.message);
-      backend.SaveStoreDeal(miner, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
-      statsStorageDealsFailed++;
+    let parseImportData;
+    const importData = await lotus.ClientImport(filePath);
+
+    if (importData && importData.result && importData.result.Root) {
+      parseImportData = importData.result.Root;
+    } else if (importData && importData.result) {
+      parseImportData = importData.result;
+    }
+
+    if (!parseImportData) {
+      ERROR('ClientImport failed: ' + filePath);
+      DeleteTestFile(filePath);
+    }
+
+    const { '/': dataCid } = parseImportData;
+    INFO("ClientImport : " + JSON.stringify(importData));
+
+    let dealCid;
+
+    if (cmdMode) {
+      INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(minerData.price) + " 30000");
+      var response = await lotus.ClientStartDealCmd(dataCid, miner, CalculateStorageDealPrice(minerData.price), '30000');
+      dealCid = RemoveLineBreaks(response);
     } else {
-
-      //generate new file
-      var filePath = RandomTestFilePath(config.bot.import);
-      var size = RandomTestFileSize();
-
-      if (size > sectorSize) {
-        ERROR(`GenerateTestFile size: ${size} > SectorSize: ${sectorSize}`);
-        size = sectorSize / 2; // TODO remove
-      }
-
-      var fileHash = GenerateTestFile(filePath, size);
-
-      const importData = await lotus.ClientImport(filePath);
-      const { '/': dataCid } = importData.result;
-      INFO("ClientImport : " + dataCid);
-
       const walletDefault = await lotus.WalletDefaultAddress();
       const wallet = walletDefault.result;
-      const epochPrice = askResponse.result.Ask.Price;
-      
+      const epochPrice = minerData.price;
+
       const dataRef = {
         Data: {
           TransferType: 'graphsync',
@@ -240,42 +315,50 @@ async function StorageDeal(miner) {
         Wallet: wallet,
         Miner: miner,
         EpochPrice: epochPrice,
-        MinBlocksDuration: 10000
+        MinBlocksDuration: 30000
       }
 
       const dealData = await lotus.ClientStartDeal(dataRef);
       const { '/': proposalCid } = dealData.result;
-
-      INFO("ClientStartDeal: " + proposalCid);
-
-      if (!storageDealsMap.has(proposalCid)) {
-        storageDealsMap.set(proposalCid, {
-          dataCid: dataCid,
-          miner: miner,
-          filePath: filePath,
-          fileHash: fileHash,
-          timestamp: Date.now()
-        })
-      }
+      dealCid = proposalCid;
     }
 
+    INFO("ClientStartDeal: " + dealCid);
+
+    if (minersMap.has(miner)) {
+      let minerData = minersMap.get(miner);
+      minerData.currentProposedDeals++;
+      minerData.currentProposedDealsSize = minerData.currentProposedDealsSize + size;
+      minerData.totalProposedDeals++;
+      minerData.totalProposedDealsSize = minerData.totalProposedDealsSize + size;
+      minersMap.set(miner, minerData);
+    }
+
+    if (!storageDealsMap.has(dealCid)) {
+      storageDealsMap.set(dealCid, {
+        dataCid: dataCid,
+        miner: miner,
+        filePath: filePath,
+        fileHash: fileHash,
+        size: size,
+        timestamp: Date.now()
+      })
+    }
   } catch (e) {
     ERROR('Error: ' + e.message);
   }
 }
 
-async function RetrieveDeal(dataCid, retrieveDeal) {
+async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
   INFO("RetrieveDeal [" + dataCid + "]");
 
   try {
     let outFile = RandomTestFilePath(config.bot.retrieve);
-
     const walletDefault = await lotus.WalletDefaultAddress();
     const wallet = walletDefault.result;
-
-    console.log(wallet);
-
     const findData = await lotus.ClientFindData(dataCid);
+
+    INFO("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
 
     const o = findData.result[0];
 
@@ -291,35 +374,59 @@ async function RetrieveDeal(dataCid, retrieveDeal) {
         MinerPeerID: o.MinerPeerID
       }
 
-      const data = await lotus.ClientRetrieve(retrievalOffer, outFile);
+      const timeoutPromise = Timeout(12*3600); // 12 hour lotus.ClientRetrieve timeout
+      let data;
+
+      pendingRetriveDealsMap.set(dataCid, {
+        miner: retrieveDeal.miner,
+        timestamp: Date.now()
+      })
+
+      if (cmdMode) {
+        const response = await Promise.race([lotus.ClientRetrieveCmd(dataCid, outFile), timeoutPromise]);
+        data = RemoveLineBreaks(response);
+      } else {
+        data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
+      }
+
       INFO(JSON.stringify(data));
 
-      if (data.error) {
-        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + " " + data.error);
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, data.error);
+      pendingRetriveDealsMap.delete(dataCid);
+
+      if (data === 'timeout') {
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';timeout');
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';timeout');
+      } else if (data.error) {
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';' + JSON.stringify(data.error));
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';' + JSON.stringify(data.error));
       } else {
         var hash = SHA256FileSync(outFile);
         INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
         if (hash == retrieveDeal.fileHash) {
           //PASSED -> send result to BE
-          PASSED('RetrieveDeal', retrieveDeal.miner, 'success outFile:' + outFile + 'sha256:' + hash);
-          backend.SaveRetrieveDeal(retrieveDeal.miner, true, 'success');
+          PASSED('RetrieveDeal', retrieveDeal.miner, dataCid + ';success outFile:' + outFile + 'sha256:' + hash);
+          backend.SaveRetrieveDeal(retrieveDeal.miner, true, dataCid + ';success');
 
           statsRetrieveDealsSuccessful++;
+          prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
           DeleteTestFile(retrieveDeal.filePath);
           retriveDealsMap.delete(dataCid);
         } else {
           //FAILED -> send result to BE
-          FAILED('RetrieveDeal', retrieveDeal.miner, 'hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
-          backend.SaveRetrieveDeal(retrieveDeal.miner, false, 'hash check failed');
+          FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
+          backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';hash check failed');
 
           statsRetrieveDealsFailed++;
+          prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
           DeleteTestFile(retrieveDeal.filePath);
           retriveDealsMap.delete(dataCid);
         }
       }
     } else {
       ERROR("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
+      //FAILED -> send result to BE
+      FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';ClientFindData failed:' + JSON.stringify(findData));
+      backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';ClientFindData failed:' + JSON.stringify(findData));
     }
   } catch (e) {
     ERROR('Error: ' + e.message);
@@ -362,27 +469,136 @@ function SHA256FileSync(path) {
   return hash.digest('hex')
 }
 
-function DealTimeout(timestamp) {
-  var timeDifference = Math.abs(Date.now() - timestamp);
+async function CalculateMinersDailyRate() {
+  var it = 0;
+  while (!stop && (it < topMinersList.length)) {
 
-  if (timeDifference > 1000 * 3600 * 48) //48 hours
-    return true;
+    if (minersMap.has(topMinersList[it].address)) {
+      let minerData = minersMap.get(topMinersList[it].address);
+      if (TimeDifferenceInHours(minerData.timestamp) >= 24) {
+        let dailyRate = (topMinersList[it].power - minerData.power) / 2;
+        if (dailyRate < MIN_DAILY_RATE) {
+          dailyRate = MIN_DAILY_RATE;
+        }
+        if (dailyRate > MAX_DAILY_RATE) {
+          dailyRate = MAX_DAILY_RATE;
+        }
 
-  return false;
+        minerData.dailyRate = dailyRate;
+        minerData.power = topMinersList[it].power;
+        minerData.currentProposedDeals = 0;
+        minerData.currentProposedDealsSize = 0;
+        minerData.timestamp = Date.now();
+
+        minersMap.set(topMinersList[it].address, minerData);
+
+        INFO(`CalculateMinersDailyRate [${topMinersList[it].address}] dailyRate: ${FormatBytes(dailyRate)}`);
+      }
+    } else {
+      minersMap.set(topMinersList[it].address, {
+        dailyRate: MIN_DAILY_RATE,
+        power: topMinersList[it].power,
+        currentProposedDeals: 0,
+        currentProposedDealsSize: 0,
+        totalProposedDeals: 0,
+        totalProposedDealsSize: 0,
+        totalSuccessfulDeals: 0,
+        totalSuccessfulDealsSize: 0,
+        timestamp: Date.now()
+      });
+    }
+
+    it++;
+  }
+}
+
+async function RunQueryAsks() {
+  let tmpMinersList = new Array;
+
+  var minersSlice = topMinersList;
+  while (minersSlice.length) {
+    await Promise.all(minersSlice.splice(0, 50).map(async (miner) => {
+      try {
+        const minerInfo = await lotus.StateMinerInfo(miner.address);
+
+        let peerId;
+        let sectorSize = minerInfo.result.SectorSize;
+
+        if (isIPFS.multihash(minerInfo.result.PeerId)) {
+          peerId = minerInfo.result.PeerId;
+        } else {
+          const PeerId = require('peer-id');
+          const binPeerId = Buffer.from(minerInfo.result.PeerId, 'base64');
+          const strPeerId = PeerId.createFromBytes(binPeerId);
+
+          peerId = strPeerId.toB58String();
+        }
+
+        INFO("StateMinerInfo [" + miner.address + "] PeerId: " + peerId);
+
+        const askResponse = await lotus.ClientQueryAsk(peerId, miner.address);
+        if (askResponse.error) {
+          INFO("ClientQueryAsk : " + JSON.stringify(askResponse));
+          //FAILED -> send result to BE
+          FAILED('StoreDeal', miner.address, 'ClientQueryAsk failed : ' + askResponse.error.message);
+          backend.SaveStoreDeal(miner.address, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
+          statsStorageDealsFailed++;
+          prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+
+          tmpMinersList.push({
+            address: miner.address,
+            peerId: peerId,
+            power: miner.power,
+            price: 0,
+            sectorSize: sectorSize,
+            online: false
+          })
+        } else {
+          tmpMinersList.push({
+            address: miner.address,
+            peerId: peerId,
+            power: miner.power,
+            price: askResponse.result.Ask.Price,
+            sectorSize: sectorSize,
+            online: true
+          })
+        }
+      } catch (e) {
+        ERROR('Error: ' + e.message);
+      }
+    }));
+  }
+
+  if (tmpMinersList.length) {
+    topMinersList.length = 0;
+    topMinersList = [...tmpMinersList];
+  }
 }
 
 async function RunStorageDeals() {
-    var it = 0;
-    while (!stop && (it < topMinersList.length)) {
-      if (storageDealsMap.size > MAX_PENDING_STORAGE_DEALS) {
-        INFO("RunStorageDeals pending storage deals = MAX_PENDING_STORAGE_DEALS");
-        break;
-      }
-
-      await StorageDeal(topMinersList[it].address);
-      await pause(1000);
-      it++;
+  var it = 0;
+  while (!stop && (it < topMinersList.length)) {
+    if (storageDealsMap.size > MAX_PENDING_STORAGE_DEALS) {
+      INFO("RunStorageDeals pending storage deals = MAX_PENDING_STORAGE_DEALS");
+      break;
     }
+
+    let makeDeal = true;
+
+    if (minersMap.has(topMinersList[it].address)) {
+      let minerData = minersMap.get(topMinersList[it].address);
+      if (minerData.currentProposedDealsSize >= minerData.dailyRate) {
+        makeDeal = false;
+        INFO(`DailyRate reached [${topMinersList[it].address}] dailyRate: ${FormatBytes(minerData.dailyRate)}`);
+      }
+    }
+
+    if (makeDeal && topMinersList[it].online) {
+      await StorageDeal(topMinersList[it], flags.cmdMode);
+      await pause(1000);
+    }
+    it++;
+  }
 }
 
 async function RunRetriveDeals() {
@@ -390,84 +606,103 @@ async function RunRetriveDeals() {
     if (stop)
      break;
 
-    await RetrieveDeal(key, value);
-    await pause(1000);
+    if (!pendingRetriveDealsMap.has(key)) {
+      RetrieveDeal(key, value, flags.cmdMode);
+    }
   }
 }
 
-function StorageDealStatus(dealCid, pendingStorageDeal) {
-  return new Promise(function (resolve, reject) {
-    lotus.ClientGetDealInfo(dealCid).then(data => {
-      if (data && data.result && data.result.State) {
+async function StorageDealStatus(dealCid, pendingStorageDeal) {
+  try {
+    var data = await lotus.ClientGetDealInfo(dealCid);
+    if (data && data.result && data.result.State) {
 
-        INFO("ClientGetDealInfo [" + dealCid + "] State: " + dealStates[data.result.State] + " dataCid: " + pendingStorageDeal.dataCid);
-        INFO("ClientGetDealInfo: " + JSON.stringify(data));
-
-
-        if (dealStates[data.result.State] == "StorageDealActive") {
-
-          statsStorageDealsSuccessful++;
-
-          //DeleteTestFile(pendingStorageDeal.filePath); TODO
-
-          if (!retriveDealsMap.has(pendingStorageDeal.dataCid)) {
-            retriveDealsMap.set(pendingStorageDeal.dataCid, {
-              miner: pendingStorageDeal.miner,
-              filePath: pendingStorageDeal.filePath,
-              fileHash: pendingStorageDeal.fileHash,
-              timestamp: Date.now()
-            })
-          }
+      INFO("ClientGetDealInfo [" + dealCid + "] State: " + dealStates[data.result.State] + " dataCid: " + pendingStorageDeal.dataCid);
+      INFO("ClientGetDealInfo: " + JSON.stringify(data));
 
 
-          //PASSED -> send result to BE
-          PASSED('StoreDeal', pendingStorageDeal.miner, 'success dataCid:' + pendingStorageDeal.dataCid, 'dealCid:' + pendingStorageDeal.dealCid);
-          backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+      if (dealStates[data.result.State] == "StorageDealActive") {
 
-          storageDealsMap.delete(dealCid);
-        } else if (dealStates[data.result.State] == "StorageDealCompleted") {
-          if (retriveDealsMap.has(pendingStorageDeal.dataCid)) {
-            retriveDealsMap.delete(pendingStorageDeal.dataCid);
-          }
+        statsStorageDealsSuccessful++;
+        prometheus.SetSuccessfulStorageDeals(statsStorageDealsSuccessful);
 
-          storageDealsMap.delete(dealCid);
-          DeleteTestFile(pendingStorageDeal.filePath);
-        } else if (dealStates[data.result.State] == "StorageDealStaged") {
-          //DeleteTestFile(pendingStorageDeal.filePath); TODO
-        } else if (dealStates[data.result.State] == "StorageDealSealing") {
-          //DeleteTestFile(pendingStorageDeal.filePath); TODO
-        } else if (dealStates[data.result.State] == "StorageDealError") {
-          //FAILED -> send result to BE
-          FAILED('StoreDeal', pendingStorageDeal.miner, 'state StorageDealError');
-          backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'state StorageDealError');
+        DeleteTestFile(pendingStorageDeal.filePath);
 
-          statsStorageDealsFailed++;
-          DeleteTestFile(pendingStorageDeal.filePath);
-          storageDealsMap.delete(dealCid);
-        } else if (DealTimeout(pendingStorageDeal.timestamp)) {
-          //FAILED -> send result to BE
-          FAILED('StoreDeal', pendingStorageDeal.miner, 'timeout in state: ' + dealStates[data.result.State]);
-          backend.SaveStoreDeal(pendingStorageDeal.miner, false, 'timeout in state: ' + dealStates[data.result.State]);
-
-          storageDealsMap.delete(dealCid);
-          statsStorageDealsFailed++;
-          DeleteTestFile(pendingStorageDeal.filePath);
+        if (!retriveDealsMap.has(pendingStorageDeal.dataCid)) {
+          retriveDealsMap.set(pendingStorageDeal.dataCid, {
+            miner: pendingStorageDeal.miner,
+            filePath: pendingStorageDeal.filePath,
+            fileHash: pendingStorageDeal.fileHash,
+            size: pendingStorageDeal.size,
+            timestamp: Date.now()
+          })
         }
 
-        resolve(true);
-      } else {
-        WARNING("ClientGetDealInfo: " + JSON.stringify(data));
-        resolve(false);
+        //PASSED -> send result to BE [dealcid;datacid;size]
+        PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
+        backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+
+        if (minersMap.has(pendingStorageDeal.miner)) {
+          let minerData = minersMap.get(pendingStorageDeal.miner);
+          minerData.totalSuccessfulDeals++;
+          minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
+          minersMap.set(pendingStorageDeal.miner, minerData);
+        }
+
+        storageDealsMap.delete(dealCid);
+      } else if (dealStates[data.result.State] == "StorageDealCompleted") {
+        if (retriveDealsMap.has(pendingStorageDeal.dataCid)) {
+          retriveDealsMap.delete(pendingStorageDeal.dataCid);
+        }
+
+        //PASSED -> send result to BE [dealcid;datacid;size]
+        PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
+        backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+
+        if (minersMap.has(pendingStorageDeal.miner)) {
+          let minerData = minersMap.get(pendingStorageDeal.miner);
+          minerData.totalSuccessfulDeals++;
+          minerData.totalSuccessfulDealsSize = minerData.totalSuccessfulDealsSize + pendingStorageDeal.size;
+          minersMap.set(pendingStorageDeal.miner, minerData);
+        }
+
+        DeleteTestFile(pendingStorageDeal.filePath);
+        storageDealsMap.delete(dealCid);
+      } else if (dealStates[data.result.State] == "StorageDealStaged") {
+        DeleteTestFile(pendingStorageDeal.filePath);
+      } else if (dealStates[data.result.State] == "StorageDealSealing") {
+        DeleteTestFile(pendingStorageDeal.filePath);
+      } else if (dealStates[data.result.State] == "StorageDealError") {
+        //FAILED -> send result to BE
+
+        FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
+        backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
+
+        statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        DeleteTestFile(pendingStorageDeal.filePath);
+        storageDealsMap.delete(dealCid);
+      } else if (DealTimeout(pendingStorageDeal.timestamp)) {
+        //FAILED -> send result to BE
+        FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
+        backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
+
+        statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        DeleteTestFile(pendingStorageDeal.filePath);
+        storageDealsMap.delete(dealCid);
       }
-    }).catch(error => {
-      ERROR(error);
-      resolve(false);
-    });
-  })
+    } else {
+      WARNING("ClientGetDealInfo: " + JSON.stringify(data));
+    }
+  } catch (e) {
+    ERROR('Error: ' + e.message);
+  }
 }
 
 async function CheckPendingStorageDeals() {
   statsStorageDealsPending = storageDealsMap.size;
+  prometheus.SetPendingStorageDeals(statsStorageDealsPending);
   for (const [key, value] of storageDealsMap.entries()) {
     if (stop)
      break;
@@ -477,12 +712,91 @@ async function CheckPendingStorageDeals() {
   }
 }
 
-function SectorLifeCycle(miner) {
-
+function SLCRange(start, end) {
+  return Array(end - start + 1).fill().map((_, idx) => start + idx)
 }
 
-function RunSLCCheck() {
+async function RunSLCCheck() {
+  var cbor = require('cbor');
+  const result = [];
+  var chainHead;
 
+  try {
+    chainHead = await lotus.ChainHead();
+  } catch (e) {
+    ERROR('Error: ' + e.message);
+  }
+
+  if (slcHeight === chainHead.result.Height) {
+    INFO(`RunSLCCheck: Height(${slcHeight}) already checked`);
+    return;
+  }
+
+  if (!slcHeight) {
+    slcHeight = chainHead.result.Height;
+    INFO(`RunSLCCheck: set slcHeight to chainHead Height(${chainHead.result.Height})`);
+  }
+
+  if (slcHeight > chainHead.result.Height) {
+    ERROR(`RunSLCCheck: slcHeight(${slcHeight}) > chainHead Height(${chainHead.result.Height})`);
+    return;
+  }
+
+  INFO("RunSLCCheck: chainHead " + chainHead.result.Height);
+
+  let blocks = SLCRange(slcHeight, chainHead.result.Height); // [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+  //let blocks = [...Array(chainHead.result.Height).keys()];
+
+  var blocksSlice = blocks;
+  while (blocksSlice.length) {
+    await Promise.all(blocksSlice.splice(0, 50).map(async (block) => {
+      try {
+        var selectedHeight = block;
+        var tipSet = (await lotus.ChainGetTipSetByHeight(selectedHeight, chainHead.result.Cids)).result;
+        if (tipSet.Blocks) {
+          for (const block of tipSet.Blocks) {
+            const level1Cid = block.Messages['/'];
+            if (level1Cid) {
+              const level2Cids = (await lotus.ChainGetNode(level1Cid)).result.Obj.map(obj => obj['/'])
+              for (const level2Cid of level2Cids) {
+                const messageCids = (await lotus.ChainGetNode(level2Cid)).result.Obj[2][2].map(obj => obj['/'])
+                for (const messageCid of messageCids) {
+                  const message = await lotus.ChainGetMessage({ '/': messageCid });
+                  if (message.result.Method === 6) {
+                    var decode = cbor.decode(Buffer.from(message.result.Params, 'base64'));
+                    if (decode[7] > 0) {
+                      backend.SaveSLC(block.Miner, true, message.result.Params);
+                      result.push({
+                        height: tipSet.Height,
+                        miner: block.Miner,
+                        decode: decode,
+                        SectorNumber: decode[1],
+                        ReplaceCapacity: decode[6],
+                        ReplaceSector: decode[7],
+                        messageCid,
+                        ...message
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        ERROR('Error: ' + e.message);
+      }
+
+    }));
+
+    INFO("RunSLCCheck: Remainig blocks: " + blocksSlice.length + " found " + result.length);
+  }
+
+  result.forEach(element => {
+    INFO(element);
+  });
+
+  slcHeight = chainHead.result.Height;
 }
 
 function PrintStats() {
@@ -496,15 +810,41 @@ function PrintStats() {
   INFO("RetrieveDeals: TOTAL : " + (statsRetrieveDealsSuccessful + statsRetrieveDealsFailed));
   INFO("RetrieveDeals: SUCCESSFUL : " + statsRetrieveDealsSuccessful);
   INFO("RetrieveDeals: FAILED : " + statsRetrieveDealsFailed);
-  INFO("***************************************")
+  INFO("***************************************");
+  for (const [key, value] of retriveDealsMap.entries()) {
+    INFO(`Retrieval Deal ${key} ${value.miner} ${value.timestamp.toLocaleString()}`);
+  }
+  INFO("***************************************");
+  for (const [key, value] of minersMap.entries()) {
+    if (value.totalProposedDealsSize > 0) {
+      INFO(`[${key}] 
+      dailyRate: ${FormatBytes(value.dailyRate)} 
+      power: ${FormatBytes(value.power)} 
+      proposed[${value.currentProposedDeals}]: ${FormatBytes(value.currentProposedDealsSize)} 
+      totalProposed[${value.totalProposedDeals}]: ${FormatBytes(value.totalProposedDealsSize)} 
+      totalSuccessful[${value.totalSuccessfulDeals}]: ${FormatBytes(value.totalSuccessfulDealsSize)}`);
+    }
+  }
+  INFO("***************************************");
 }
 
 const pause = (timeout) => new Promise(res => setTimeout(res, timeout));
 
 const mainLoop = async _ => {
-  while (!stop) {
+  if (flags.standalone) {
     await LoadMiners();
+  }
+
+  while (!stop) {
+    if (!flags.standalone) {
+      await LoadMiners();
+    }
+    await CalculateMinersDailyRate();
+    await RunQueryAsks();
     await RunStorageDeals();
+    if (flags.slc) {
+      await RunSLCCheck();
+    }
     await CheckPendingStorageDeals();
     await RunRetriveDeals();
     await pause(2000);

@@ -1,6 +1,7 @@
 'use strict';
 
 const config = require('./config');
+var spawn = require("spawn-promise");
 
 let api = config.lotus.api;
 let token = config.lotus.token;
@@ -89,7 +90,110 @@ function WalletDefaultAddress() {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.WalletDefaultAddress", "params": [], "id": 0 }));
 }
 
+function ClientStartDealCmd(dataCid, miner, price, duration) {
+    return spawn('lotus', ["client", "deal", dataCid, miner, price, duration], null);
+}
+
+function NetConnectedness(peerId) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.NetConnectedness", "params": [peerId], "id": 0 }));
+}
+
+function ClientRetrieveCmd(dataCid, outFile) {
+    return spawn('lotus', ["client", "retrieve", dataCid, outFile], null);
+}
+
+function Version() {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.Version", "params": [], "id": 0 }));
+}
+
+function ChainHead() {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainHead", "params": [], "id": 0 }));
+}
+
+function ChainGetTipSetByHeight(selectedHeight, headTipSet) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetTipSetByHeight", "params": [selectedHeight, headTipSet], "id": 0 }));
+}
+
+function ChainGetTipSet(tipSetKey) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetTipSet", "params": [tipSetKey], "id": 0 }));
+}
+
+function ChainGetNode(nodeCid) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetNode", "params": [nodeCid], "id": 0 }));
+}
+
+function ChainGetMessage(messageCid) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetMessage", "params": [messageCid], "id": 0 }));
+}
+
 var args = process.argv.slice(2);
+
+if (args[0] === 'test-slc') {
+    var cbor = require('cbor');
+
+    api = 'http://104.248.116.108:1234/rpc/v0'; // qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.b4J6r2hB4FTgHicCUEJZhZzDn9et3Zhqwh8DiNkgxcQ';// qabot2
+
+    (async () => {
+        const result = [];
+        var version = await Version();
+        var chainHead = await ChainHead();
+
+        console.log("version: " + version.result.Version);
+        console.log(" chainHead.result.Cids: " + JSON.stringify(chainHead.result.Cids));
+
+        let blocks = [...Array(chainHead.result.Height).keys()];
+
+        var blocksSlice = blocks;
+        while (blocksSlice.length) {
+            await Promise.all(blocksSlice.splice(0, 50).map(async (block) => {
+                try {
+                    var selectedHeight = block;
+                    var tipSet = (await ChainGetTipSetByHeight(selectedHeight, chainHead.result.Cids)).result;
+                    if (tipSet.Blocks) {
+                        for (const block of tipSet.Blocks) {
+                            const level1Cid = block.Messages['/'];
+                            if (level1Cid) {
+                                const level2Cids = (await ChainGetNode(level1Cid)).result.Obj.map(obj => obj['/'])
+                                for (const level2Cid of level2Cids) {
+                                    const messageCids = (await ChainGetNode(level2Cid)).result.Obj[2][2].map(obj => obj['/'])
+                                    for (const messageCid of messageCids) {
+                                        const message = await ChainGetMessage({ '/': messageCid });
+                                        if (message.result.Method === 6) {
+                                            var decode = cbor.decode(Buffer.from(message.result.Params, 'base64'));
+                                            if (decode[7] > 0) {
+                                                result.push({
+                                                    height: tipSet.Height,
+                                                    miner: block.Miner,
+                                                    decode: decode,
+                                                    SectorNumber: decode[1],
+                                                    ReplaceCapacity: decode[6],
+                                                    ReplaceSector: decode[7],
+                                                    messageCid,
+                                                    ...message
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.log('Error: ' + e.message);
+                }
+
+            }));
+
+            console.log("Remainig blocks: " + blocksSlice.length + " " + result.length);
+        }
+
+        result.forEach(element => {
+                console.log(element)
+        });
+
+    })();
+}
 
 if (args[0] === 'test-ip') {
     api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
@@ -105,6 +209,20 @@ if (args[0] === 'test-ip') {
     }).catch(error => {
         console.log(error);
     });
+}
+
+if (args[0] === 'test-online') {
+    api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.XCVQTyuuh8Qh0_KiQt8f2EuaiYj8UlZ9ns5q29acWAc';// qabot1
+
+    (async () => {
+        const {result} = await NetConnectedness('12D3KooWDgdHbJeoVbcGKkvFhB49mP5B2cq5vYuRGNnzSQHSpkhs');
+        console.log(result);
+        console.log("NetConnectedness " + ((result == 1) ? 'online' : 'offline'));
+        const response = await NetConnectedness('12D3KooWNc5J8V3HgMjS63E7zRCqXbfBrRzQp9Bs9oZ5WAPBfeAU');
+        console.log(response);
+        console.log("NetConnectedness " + ((response.result == 1) ? 'online' : 'offline'));
+    })();
 }
 
 if (args[0] === 'test-retrive') {
@@ -136,7 +254,7 @@ if (args[0] === 'test-retrive') {
                 MinerPeerID: o.MinerPeerID
             }
 
-            ClientRetrieve2(retrievalOffer,
+            ClientRetrieve(retrievalOffer,
                 '/root/retrieve/out3.data').then(data => {
                 console.log(JSON.stringify(data));
             }).catch(error => {
@@ -206,16 +324,17 @@ if (args[0] === 'test-sector') {
 
 if (args[0] === 'test-store') {
     api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.h5QDbjr-3cTI3Jnc4xczWvUBpK2-jTM65JOQGj2fnvA'; // qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.uxVEWd2TmAX498c4Fak9xmbR9ocXaiYwZuelf4_yluY'; // qabot2
 
     (async () => {
         try {
-            const minerInfo = StateMinerInfo('t02429');
+            //let miner = 't02041';
+            let miner = 't05548';
+            const minerInfo = await StateMinerInfo(miner);
+            const { PeerId } = minerInfo.result;
             console.log(minerInfo);
 
-            return;
-
-            const importData = await ClientImport('/root/import2.log')
+            const importData = await ClientImport('/root/import4.log')
             const { '/': dataCid } = importData.result;
             console.log(dataCid);
 
@@ -224,7 +343,7 @@ if (args[0] === 'test-store') {
 
             console.log(wallet);
 
-            const ask = await ClientQueryAsk('12D3KooWS13JZpyKA7t2awQAnawk4njgA6TYTevi5ocrHxnRGmFY', 't02429');
+            const ask = await ClientQueryAsk(PeerId, miner);
             console.log(ask);
 
             const epochPrice = '500000000';//'2600';
@@ -239,14 +358,14 @@ if (args[0] === 'test-store') {
                     PieceSize: 0
                 },
                 Wallet: wallet,
-                Miner: 't02429',
+                Miner: miner,
                 EpochPrice: epochPrice,
                 MinBlocksDuration: 10000
             }
 
             const dealData = await ClientStartDeal(dataRef);
             const { '/': proposalCid } = dealData.result;
-
+            console.log(dealData);
             console.log(proposalCid);
 
         } catch (e) {
@@ -254,8 +373,6 @@ if (args[0] === 'test-store') {
         }
 
     })();
-    
-
 }
 
 if (args[0] === 'test') {
@@ -297,4 +414,13 @@ module.exports = {
     ClientImport,
     ClientRetrieve,
     WalletDefaultAddress,
+    NetConnectedness,
+    ClientStartDealCmd,
+    ClientRetrieveCmd,
+    Version,
+    ChainHead,
+    ChainGetTipSetByHeight,
+    ChainGetTipSet,
+    ChainGetNode,
+    ChainGetMessage,
 };
