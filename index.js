@@ -396,9 +396,19 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       if (data === 'timeout') {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';timeout');
         backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';timeout');
+
+        statsRetrieveDealsFailed++;
+        prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
+        DeleteTestFile(retrieveDeal.filePath);
+        retriveDealsMap.delete(dataCid);
       } else if (data.error) {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';' + JSON.stringify(data.error));
         backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';' + JSON.stringify(data.error));
+
+        statsRetrieveDealsFailed++;
+        prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
+        DeleteTestFile(retrieveDeal.filePath);
+        retriveDealsMap.delete(dataCid);
       } else {
         var hash = SHA256FileSync(outFile);
         INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
