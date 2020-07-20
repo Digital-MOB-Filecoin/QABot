@@ -44,7 +44,7 @@ args
   .option('standalone', 'Run the Bot standalone')
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_LARGE)
-  .option('slc', 'Enable/Disable slc', true)
+  .option('slc', 'Enable/Disable slc', false)
   .option('slcHeight', 'SLC start height')
  
 const flags = args.parse(process.argv)
