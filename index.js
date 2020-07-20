@@ -28,11 +28,12 @@ let statsRetrieveDealsFailed = 0;
 
 const RETRIVING_ARRAY_MAX_SIZE = 1000000; //items
 const BUFFER_SIZE = 65536; //64KB
+const FILE_SIZE_EXTRA_SMALL = 100;
 const FILE_SIZE_SMALL = 104857600;   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824;  //(1GB)
 const FILE_SIZE_LARGE = 5368709120;  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100;
-const MIN_DAILY_RATE = 10737418240; //10GB
+const MIN_DAILY_RATE = 5368709120; //5GB
 const MAX_DAILY_RATE = 268435456000; //250GB
 
 let backend;
@@ -43,7 +44,7 @@ const args = require('args')
 args
   .option('standalone', 'Run the Bot standalone')
   .option('cmdMode', 'Use lotus commands')
-  .option('size', 'Test file size', FILE_SIZE_LARGE)
+  .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
   .option('slc', 'Enable/Disable slc', false)
   .option('slcHeight', 'SLC start height')
  
