@@ -62,30 +62,32 @@ if (flags.slcHeight) {
 
 const dealStates = [
   'StorageDealUnknown',
-  'StorageDealProposalNotFound',
-  'StorageDealProposalRejected',
-  'StorageDealProposalAccepted',
-  'StorageDealStaged',
-  'StorageDealSealing',
-  'StorageDealActive',
-  'StorageDealFailing',
-  'StorageDealNotFound',
-  // Internal
-  'StorageDealFundsEnsured',          // Deposited funds as neccesary to create a deal, ready to move forward
-  'StorageDealWaitingForDataRequest', // Client is waiting for a request for the deal data
-  'StorageDealValidating',            // Verifying that deal parameters are good
-  'StorageDealAcceptWait',            // Deciding whether or not to accept the deal
-  'StorageDealTransferring',          // Moving data
-  'StorageDealWaitingForData',        // Manual transfer
-  'StorageDealVerifyData',            // Verify transferred data - generate CAR / piece data
-  'StorageDealEnsureProviderFunds',   // Ensuring that provider collateral is sufficient
-  'StorageDealEnsureClientFunds',     // Ensuring that client funds are sufficient
-  'StorageDealProviderFunding',       // Waiting for funds to appear in Provider balance
-  'StorageDealClientFunding',         // Waiting for funds to appear in Client balance
-  'StorageDealPublish',               // Publishing deal to chain
-  'StorageDealPublishing',            // Waiting for deal to appear on chain
-  'StorageDealError',                 // deal failed with an unexpected error
-  'StorageDealCompleted',             // on provider side, indicates deal is active and info for retrieval is recorded
+	'StorageDealProposalNotFound',
+	'StorageDealProposalRejected',
+	'StorageDealProposalAccepted',
+	'StorageDealStaged',
+	'StorageDealSealing',
+	'StorageDealRecordPiece',
+	'StorageDealActive',
+	'StorageDealExpired',
+	'StorageDealSlashed',
+	'StorageDealRejecting',
+	'StorageDealFailing',
+	'StorageDealFundsEnsured',
+	'StorageDealCheckForAcceptance',
+	'StorageDealValidating',
+	'StorageDealAcceptWait',
+	'StorageDealStartDataTransfer',
+	'StorageDealTransferring',
+	'StorageDealWaitingForData',
+	'StorageDealVerifyData',
+	'StorageDealEnsureProviderFunds',
+	'StorageDealEnsureClientFunds',
+	'StorageDealProviderFunding',
+	'StorageDealClientFunding',
+	'StorageDealPublish',
+	'StorageDealPublishing',
+	'StorageDealError',
 ]
 
 function INFO(msg) {
@@ -531,6 +533,7 @@ async function RunQueryAsks() {
     await Promise.all(minersSlice.splice(0, 50).map(async (miner) => {
       try {
         const minerInfo = await lotus.StateMinerInfo(miner.address);
+        INFO(JSON.stringify(minerInfo));
 
         let peerId;
         let sectorSize = minerInfo.result.SectorSize;
@@ -661,7 +664,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
         }
 
         storageDealsMap.delete(dealCid);
-      } else if (dealStates[data.result.State] == "StorageDealCompleted") {
+      } else if (dealStates[data.result.State] == "StorageDealExpired") {
         if (retriveDealsMap.has(pendingStorageDeal.dataCid)) {
           retriveDealsMap.delete(pendingStorageDeal.dataCid);
         }
