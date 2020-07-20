@@ -38,10 +38,6 @@ function ClientQueryAsk(peerID, miner) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientQueryAsk", "params": [peerID, miner], "id": 0 }));
 }
 
-function ClientFindData(dataCid) {
-    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientFindData", "params": [dataCid], "id": 0 }));
-}
-
 function ClientGetDealInfo(dealCid) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientGetDealInfo", "params": [{"/":dealCid}], "id": 0 }));
 }
@@ -59,7 +55,7 @@ function ClientImport(file) {
 }
 
 function ClientFindData(dataCid) {
-    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientFindData", "params": [{"/":dataCid}], "id": 0 }));
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientFindData", "params": [{"/":dataCid}, null], "id": 0 }));
 }
 
 function ClientRetrieve(retrievalOffer, outFile) {
@@ -226,8 +222,8 @@ if (args[0] === 'test-online') {
 }
 
 if (args[0] === 'test-retrive') {
-    api = 'http://178.128.158.180:3999/rpc/v0'; // qabot3
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.cTVmgaA1YTMIhwcj-lPRwH0VALPpHojxPycZEP05bcY';// qabot2
+    //api = 'http://178.128.158.180:3999/rpc/v0'; // qabot3
+    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.cTVmgaA1YTMIhwcj-lPRwH0VALPpHojxPycZEP05bcY';// qabot2
     //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
     //api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
 
@@ -238,13 +234,13 @@ if (args[0] === 'test-retrive') {
 
         console.log(wallet);
 
-        const findData = await ClientFindData('QmdrjQhPaR7MeXFfK8PiFV9oq9Dvme71X1x2kRQX8SxQVs')
+        const findData = await ClientFindData('bafk2bzacecswge2dwqtcaxixebfjpne3lmmbrd7puo5mxdotqhiflpk2kw3dg')
 
         const o = findData.result[0];
 
         if (findData.result) {
             const retrievalOffer = {
-                Root: 'QmdrjQhPaR7MeXFfK8PiFV9oq9Dvme71X1x2kRQX8SxQVs',
+                Root: 'bafk2bzacecswge2dwqtcaxixebfjpne3lmmbrd7puo5mxdotqhiflpk2kw3dg',
                 Size: o.Size,
                 Total: o.MinPrice,
                 PaymentInterval: o.PaymentInterval,
