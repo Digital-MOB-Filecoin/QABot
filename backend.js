@@ -23,6 +23,8 @@ class BackendClient {
 
     GetMiners(skip) {
         const axios = require('axios');
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${config.backend.token}` }
+        
         return axios.get(config.backend.api + 'miner/bot', {
             params: {
                 all: true,
