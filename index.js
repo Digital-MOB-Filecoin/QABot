@@ -45,15 +45,23 @@ args
   .option('standalone', 'Run the Bot standalone')
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
+  .option('dev', 'Dev env', false)
   .option('slc', 'Enable/Disable slc', false)
   .option('slcHeight', 'SLC start height')
  
 const flags = args.parse(process.argv)
 
-if (flags.standalone) {
-  backend = BackendClient.Shared(true);
+let backendConfig;
+if (flags.dev) {
+  backendConfig = config.backend_dev;
 } else {
-  backend = BackendClient.Shared(false);
+  backendConfig = config.backend;
+}
+
+if (flags.standalone) {
+  backend = BackendClient.Shared(true, backendConfig);
+} else {
+  backend = BackendClient.Shared(false, backendConfig);
 }
 
 if (flags.slcHeight) {
