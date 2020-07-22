@@ -1,20 +1,21 @@
 'use strict';
 
-const config = require('./config');
-
 class BackendClient {
-    constructor(dummyMode) {
+    constructor(dummyMode, config) {
         this.dummyMode = dummyMode;
+        this.api = config.api;
+        this.token = config.token;
     }
 
     Close() {
         return this.client.close();
     }
 
-    static Shared(dummyMode = false) {
+    static Shared(dummyMode = false, config) {
         if (!this.instance) {
             this.instance = new BackendClient(
                 dummyMode,
+                config,
             );
         }
 
@@ -23,9 +24,9 @@ class BackendClient {
 
     GetMiners(skip) {
         const axios = require('axios');
-        axios.defaults.headers.common = { 'Authorization': `Bearer ${config.backend.token}` }
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${this.token}` }
         
-        return axios.get(config.backend.api + 'miner/bot', {
+        return axios.get(this.api + 'miner/bot', {
             params: {
                 all: true,
                 skip: skip
@@ -43,9 +44,9 @@ class BackendClient {
             message;
 
         const axios = require('axios');
-        axios.defaults.headers.common = { 'Authorization': `Bearer ${config.backend.token}` }
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${this.token}` }
 
-        return axios.post(config.backend.api + 'miner/deal',
+        return axios.post(this.api + 'miner/deal',
             {
                 miner_id: miner_id,
                 type: type,
@@ -64,9 +65,9 @@ class BackendClient {
             message;
 
         const axios = require('axios');
-        axios.defaults.headers.common = { 'Authorization': `Bearer ${config.backend.token}` }
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${this.token}` }
 
-        return axios.post(config.backend.api + 'miner/slc',
+        return axios.post(this.api + 'miner/slc',
             {
                 miner_id: miner_id,
                 success: success,

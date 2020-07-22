@@ -35,6 +35,7 @@ const FILE_SIZE_LARGE = 5368709120;  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100;
 const MIN_DAILY_RATE = 5368709120; //5GB
 const MAX_DAILY_RATE = 268435456000; //250GB
+const MAX_RETRIEVE_DEALS_RUNS = 2;
 
 let backend;
 let slcHeight;
@@ -45,15 +46,23 @@ args
   .option('standalone', 'Run the Bot standalone')
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
+  .option('dev', 'Dev env', false)
   .option('slc', 'Enable/Disable slc', false)
   .option('slcHeight', 'SLC start height')
  
 const flags = args.parse(process.argv)
 
-if (flags.standalone) {
-  backend = BackendClient.Shared(true);
+let backendConfig;
+if (flags.dev) {
+  backendConfig = config.backend_dev;
 } else {
-  backend = BackendClient.Shared(false);
+  backendConfig = config.backend;
+}
+
+if (flags.standalone) {
+  backend = BackendClient.Shared(true, backendConfig);
+} else {
+  backend = BackendClient.Shared(false, backendConfig);
 }
 
 if (flags.slcHeight) {
@@ -377,7 +386,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         MinerPeerID: o.MinerPeerID
       }
 
-      const timeoutPromise = Timeout(12*3600); // 12 hour lotus.ClientRetrieve timeout
+      const timeoutPromise = Timeout(1*3600); // 1 hour lotus.ClientRetrieve timeout
       let data;
 
       pendingRetriveDealsMap.set(dataCid, {
@@ -386,7 +395,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       })
 
       if (cmdMode) {
-        const response = await Promise.race([lotus.ClientRetrieveCmd(dataCid, outFile), timeoutPromise]);
+        const response = await Promise.race([lotus.ClientRetrieveCmd(retrieveDeal.miner, dataCid, outFile), timeoutPromise]);
         data = RemoveLineBreaks(response);
       } else {
         data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
@@ -616,12 +625,19 @@ async function RunStorageDeals() {
 }
 
 async function RunRetriveDeals() {
+  let retriveDealsRuns = 0;
   for (const [key, value] of retriveDealsMap.entries()) {
     if (stop)
      break;
 
+    if (retriveDealsRuns >= MAX_RETRIEVE_DEALS_RUNS) {
+      break;
+    }
+
     if (!pendingRetriveDealsMap.has(key)) {
-      RetrieveDeal(key, value, flags.cmdMode);
+      retriveDealsRuns++;
+      await RetrieveDeal(key, value, flags.cmdMode);
+      await pause(1000);
     }
   }
 }
