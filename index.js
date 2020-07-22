@@ -69,6 +69,8 @@ if (flags.slcHeight) {
   slcHeight = flags.slcHeight;
 }
 
+const pause = (timeout) => new Promise(res => setTimeout(res, timeout));
+
 const dealStates = [
   'StorageDealUnknown',
 	'StorageDealProposalNotFound',
@@ -539,7 +541,7 @@ async function RunQueryAsks() {
 
   var minersSlice = topMinersList;
   while (minersSlice.length) {
-    await Promise.all(minersSlice.splice(0, 50).map(async (miner) => {
+    await Promise.all(minersSlice.splice(0, 10).map(async (miner) => {
       try {
         const minerInfo = await lotus.StateMinerInfo(miner.address);
         INFO(JSON.stringify(minerInfo));
@@ -590,6 +592,7 @@ async function RunQueryAsks() {
         ERROR('Error: ' + e.message);
       }
     }));
+    await pause(1000);
   }
 
   if (tmpMinersList.length) {
@@ -857,8 +860,6 @@ function PrintStats() {
   }
   INFO("***************************************");
 }
-
-const pause = (timeout) => new Promise(res => setTimeout(res, timeout));
 
 const mainLoop = async _ => {
   if (flags.standalone) {
