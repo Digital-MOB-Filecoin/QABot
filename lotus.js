@@ -94,8 +94,8 @@ function NetConnectedness(peerId) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.NetConnectedness", "params": [peerId], "id": 0 }));
 }
 
-function ClientRetrieveCmd(dataCid, outFile) {
-    return spawn('lotus', ["client", "retrieve", dataCid, outFile], null);
+function ClientRetrieveCmd(miner, dataCid, outFile) {
+    return spawn('lotus', ["client", "retrieve", "--miner=" + miner, dataCid, outFile], null);
 }
 
 function Version() {

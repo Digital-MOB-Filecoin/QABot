@@ -377,7 +377,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         MinerPeerID: o.MinerPeerID
       }
 
-      const timeoutPromise = Timeout(12*3600); // 12 hour lotus.ClientRetrieve timeout
+      const timeoutPromise = Timeout(1*3600); // 1 hour lotus.ClientRetrieve timeout
       let data;
 
       pendingRetriveDealsMap.set(dataCid, {
@@ -386,7 +386,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       })
 
       if (cmdMode) {
-        const response = await Promise.race([lotus.ClientRetrieveCmd(dataCid, outFile), timeoutPromise]);
+        const response = await Promise.race([lotus.ClientRetrieveCmd(retrieveDeal.miner, dataCid, outFile), timeoutPromise]);
         data = RemoveLineBreaks(response);
       } else {
         data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
@@ -621,7 +621,7 @@ async function RunRetriveDeals() {
      break;
 
     if (!pendingRetriveDealsMap.has(key)) {
-      RetrieveDeal(key, value, flags.cmdMode);
+      await RetrieveDeal(key, value, flags.cmdMode);
     }
   }
 }
