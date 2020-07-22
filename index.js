@@ -299,8 +299,9 @@ async function StorageDeal(minerData, cmdMode = false) {
     }
 
     if (!parseImportData) {
-      ERROR('ClientImport failed: ' + filePath);
+      ERROR('ClientImport failed: ' + + JSON.stringify(importData));
       DeleteTestFile(filePath);
+      return;
     }
 
     const { '/': dataCid } = parseImportData;
