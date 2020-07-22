@@ -43,7 +43,7 @@ let slcHeight;
 const args = require('args')
  
 args
-  .option('standalone', 'Run the Bot standalone')
+  .option('standalone', 'Run the Bot standalone', true)
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
   .option('dev', 'Dev env', false)
