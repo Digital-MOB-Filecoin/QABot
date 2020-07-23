@@ -44,6 +44,7 @@ const args = require('args')
  
 args
   .option('standalone', 'Run the Bot standalone', true)
+  .option('standalone_minerlist', 'Get miner list from lotus')
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
   .option('dev', 'Dev env', false)
@@ -863,12 +864,12 @@ function PrintStats() {
 }
 
 const mainLoop = async _ => {
-  if (flags.standalone) {
+  if (flags.standalone_minerlist) {
     await LoadMiners();
   }
 
   while (!stop) {
-    if (!flags.standalone) {
+    if (!flags.standalone_minerlist) {
       await LoadMiners();
     }
     await CalculateMinersDailyRate();
