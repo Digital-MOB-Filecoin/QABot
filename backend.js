@@ -105,14 +105,14 @@ if (args[0] === 'test') {
         console.log(error);
     });
 
-    backend.SaveStoreDeal('t01004', false, 'n/a', 'n/a', 0, 'test').then(response => {
+    backend.SaveStoreDeal('t04448', false, 'n/a', 'n/a', 0, 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
     });
 
-    backend.SaveRetrieveDeal('t01004', false, 'dataCid', 'dealCid', 100, 'test').then(response => {
+    backend.SaveRetrieveDeal('t04448', false, 'dataCid', 'dealCid', 100, 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
