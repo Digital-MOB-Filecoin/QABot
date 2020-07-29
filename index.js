@@ -44,7 +44,7 @@ const args = require('args')
  
 args
   .option('standalone', 'Run the Bot standalone', true)
-  .option('standalone_minerlist', 'Get miner list from lotus')
+  .option('standalone_minerlist', 'Get miner list from lotus', false)
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
   .option('dev', 'Dev env', false)
