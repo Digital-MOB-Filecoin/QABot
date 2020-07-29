@@ -411,7 +411,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
 
       if (data === 'timeout') {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';timeout');
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';timeout');
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, 'timeout');
 
         statsRetrieveDealsFailed++;
         prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
@@ -419,7 +419,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         retriveDealsMap.delete(dataCid);
       } else if (data.error) {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';' + JSON.stringify(data.error));
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';' + JSON.stringify(data.error));
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, JSON.stringify(data.error));
 
         statsRetrieveDealsFailed++;
         prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
@@ -431,7 +431,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         if (hash == retrieveDeal.fileHash) {
           //PASSED -> send result to BE
           PASSED('RetrieveDeal', retrieveDeal.miner, dataCid + ';success outFile:' + outFile + 'sha256:' + hash);
-          backend.SaveRetrieveDeal(retrieveDeal.miner, true, dataCid + ';success');
+          backend.SaveRetrieveDeal(retrieveDeal.miner, true, dataCid, 'n/a', retrieveDeal.size, 'success');
 
           statsRetrieveDealsSuccessful++;
           prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
@@ -440,7 +440,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         } else {
           //FAILED -> send result to BE
           FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
-          backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';hash check failed');
+          backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, 'hash check failed');
 
           statsRetrieveDealsFailed++;
           prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
@@ -452,7 +452,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       ERROR("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
       //FAILED -> send result to BE
       FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';ClientFindData failed:' + JSON.stringify(findData));
-      backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid + ';ClientFindData failed:' + JSON.stringify(findData));
+      backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, 'ClientFindData failed:' + JSON.stringify(findData));
     }
   } catch (e) {
     ERROR('Error: ' + e.message);
@@ -568,7 +568,7 @@ async function RunQueryAsks() {
           INFO("ClientQueryAsk : " + JSON.stringify(askResponse));
           //FAILED -> send result to BE
           FAILED('StoreDeal', miner.address, 'ClientQueryAsk failed : ' + askResponse.error.message);
-          backend.SaveStoreDeal(miner.address, false, 'ClientQueryAsk failed : ' + askResponse.error.message);
+          backend.SaveStoreDeal(miner.address, false, 'n/a', 'n/a', 0, 'ClientQueryAsk failed : ' + askResponse.error.message);
           statsStorageDealsFailed++;
           prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
 
@@ -675,7 +675,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
 
         //PASSED -> send result to BE [dealcid;datacid;size]
         PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
-        backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+        backend.SaveStoreDeal(pendingStorageDeal.miner, true, pendingStorageDeal.dataCid, dealCid, pendingStorageDeal.size, 'success');
 
         if (minersMap.has(pendingStorageDeal.miner)) {
           let minerData = minersMap.get(pendingStorageDeal.miner);
@@ -692,7 +692,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
 
         //PASSED -> send result to BE [dealcid;datacid;size]
         PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
-        backend.SaveStoreDeal(pendingStorageDeal.miner, true, 'success');
+        backend.SaveStoreDeal(pendingStorageDeal.miner, true, pendingStorageDeal.dataCid, dealCid, pendingStorageDeal.size, 'success');
 
         if (minersMap.has(pendingStorageDeal.miner)) {
           let minerData = minersMap.get(pendingStorageDeal.miner);
@@ -711,7 +711,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
         //FAILED -> send result to BE
 
         FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
-        backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
+        backend.SaveStoreDeal(pendingStorageDeal.miner, false, pendingStorageDeal.dataCid, dealCid, pendingStorageDeal.size, dealStates[data.result.State]);
 
         statsStorageDealsFailed++;
         prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
@@ -720,7 +720,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
       } else if (DealTimeout(pendingStorageDeal.timestamp)) {
         //FAILED -> send result to BE
         FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
-        backend.SaveStoreDeal(pendingStorageDeal.miner, false, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State] + ';' + 'timeout');
+        backend.SaveStoreDeal(pendingStorageDeal.miner, false, pendingStorageDeal.dataCid, dealCid, pendingStorageDeal.size, 'timeout in state:' + dealStates[data.result.State]);
 
         statsStorageDealsFailed++;
         prometheus.SetFailedStorageDeals(statsStorageDealsFailed);

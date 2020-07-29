@@ -34,7 +34,7 @@ class BackendClient {
         })
     }
 
-    SaveDeal(miner_id, type, success, message) {
+    SaveDeal(miner_id, type, success, dataCid, dealCid, fileSize, message,) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
@@ -52,7 +52,10 @@ class BackendClient {
                 type: type,
                 success: success,
                 message: trimmedMessage,
-            })
+                data_cid: dataCid,
+                deal_cid: dealCid,
+                file_size: fileSize
+              })
     }
 
     SaveSLC(miner_id, success, message) {
@@ -75,24 +78,25 @@ class BackendClient {
             })
     }
 
-    SaveStoreDeal(miner_id, success, message) {
+    SaveStoreDeal(miner_id, success, dataCid, dealCid, fileSize, message) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        return this.SaveDeal(miner_id, 'store', success, message);
+        return this.SaveDeal(miner_id, 'store', success, dataCid, dealCid, fileSize, message);
     }
 
-    SaveRetrieveDeal(miner_id, success, message) {
+    SaveRetrieveDeal(miner_id, success, dataCid, dealCid, fileSize, message) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        return this.SaveDeal(miner_id, 'retrieve', success, message);
+        return this.SaveDeal(miner_id, 'retrieve', success, dataCid, dealCid, fileSize, message);
     }
 }
 
 var args = process.argv.slice(2);
 if (args[0] === 'test') {
-    const backend = BackendClient.Shared();
+    const config = require('./config');
+    const backend = BackendClient.Shared(false, config.backend_dev);
 
     backend.GetMiners().then(response => {
         console.log(response.data);
@@ -101,21 +105,21 @@ if (args[0] === 'test') {
         console.log(error);
     });
 
-    backend.SaveStoreDeal('t01891', false, 'test').then(response => {
+    backend.SaveStoreDeal('t01004', false, 'n/a', 'n/a', 0, 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
     });
 
-    backend.SaveRetrieveDeal('t01891', false, 'test').then(response => {
+    backend.SaveRetrieveDeal('t01004', false, 'dataCid', 'dealCid', 100, 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
     });
 
-    backend.SaveSLC('t0121507', false, 'test').then(response => {
+    backend.SaveSLC('t01004', false, 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
