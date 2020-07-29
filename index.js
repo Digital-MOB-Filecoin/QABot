@@ -48,8 +48,8 @@ args
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
   .option('dev', 'Dev env', false)
-  .option('slc', 'Enable/Disable slc', false)
-  .option('slcHeight', 'SLC start height')
+  .option('slc', 'Enable/Disable slc', true)
+  .option('slcHeight', 'SLC start height', 1)
  
 const flags = args.parse(process.argv)
 
