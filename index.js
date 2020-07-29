@@ -256,7 +256,7 @@ async function LoadMinersLotusWs() {
 }
 
 async function LoadMiners() {
-  if (flags.standalone) {
+  if (flags.standalone_minerlist) {
     return await LoadMinersLotusWs();
   } else {
     return await LoadMinersFromBackend();
