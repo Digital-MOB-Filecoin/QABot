@@ -35,7 +35,6 @@ const FILE_SIZE_LARGE = 5368709120;  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100;
 const MIN_DAILY_RATE = 5368709120; //5GB
 const MAX_DAILY_RATE = 268435456000; //250GB
-const MAX_RETRIEVE_DEALS_RUNS = 2;
 
 let backend;
 let slcHeight;
@@ -630,18 +629,12 @@ async function RunStorageDeals() {
 }
 
 async function RunRetriveDeals() {
-  let retriveDealsRuns = 0;
   for (const [key, value] of retriveDealsMap.entries()) {
     if (stop)
      break;
 
-    if (retriveDealsRuns >= MAX_RETRIEVE_DEALS_RUNS) {
-      break;
-    }
-
     if (!pendingRetriveDealsMap.has(key)) {
-      retriveDealsRuns++;
-      await RetrieveDeal(key, value, flags.cmdMode);
+      RetrieveDeal(key, value, flags.cmdMode);
       await pause(1000);
     }
   }
