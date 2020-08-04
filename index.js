@@ -43,7 +43,7 @@ let slcHeight;
 const args = require('args')
  
 args
-  .option('standalone', 'Run the Bot standalone', true)
+  .option('standalone', 'Run the Bot standalone', false)
   .option('standalone_minerlist', 'Get miner list from lotus', false)
   .option('cmdMode', 'Use lotus commands')
   .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
