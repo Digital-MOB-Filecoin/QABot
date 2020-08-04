@@ -34,7 +34,31 @@ class BackendClient {
         })
     }
 
-    SaveDeal(miner_id, type, success, dataCid, dealCid, fileSize, message,) {
+    GetCids(skip) {
+        const axios = require('axios');
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${this.token}` }
+        
+        return axios.get(this.api + 'miner/cid', {
+            params: {
+                skip: skip
+            }
+        })
+    }
+
+    DeleteCid(cid) {
+        if (this.dummyMode)
+            return Promise.resolve('dummy');
+
+        const axios = require('axios');
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${this.token}` }
+
+        return axios.delete(this.api + 'miner/cid',
+            {
+                cid: cid,
+            })
+    }
+
+    SaveDeal(miner_id, type, success, dataCid, dealCid, fileSize, hash, message) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
@@ -54,7 +78,8 @@ class BackendClient {
                 message: trimmedMessage,
                 data_cid: dataCid,
                 deal_cid: dealCid,
-                file_size: fileSize
+                file_size: fileSize,
+                hash: hash
               })
     }
 
@@ -78,18 +103,18 @@ class BackendClient {
             })
     }
 
-    SaveStoreDeal(miner_id, success, dataCid, dealCid, fileSize, message) {
+    SaveStoreDeal(miner_id, success, dataCid, dealCid, fileSize, hash, message) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        return this.SaveDeal(miner_id, 'store', success, dataCid, dealCid, fileSize, message);
+        return this.SaveDeal(miner_id, 'store', success, dataCid, dealCid, fileSize, hash, message);
     }
 
-    SaveRetrieveDeal(miner_id, success, dataCid, dealCid, fileSize, message) {
+    SaveRetrieveDeal(miner_id, success, dataCid, dealCid, fileSize, hash, message) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        return this.SaveDeal(miner_id, 'retrieve', success, dataCid, dealCid, fileSize, message);
+        return this.SaveDeal(miner_id, 'retrieve', success, dataCid, dealCid, fileSize, hash, message);
     }
 }
 
@@ -98,22 +123,29 @@ if (args[0] === 'test') {
     const config = require('./config');
     const backend = BackendClient.Shared(false, config.backend_dev);
 
-    backend.GetMiners().then(response => {
+    /*backend.GetMiners().then(response => {
+        console.log(response.data);
+        console.log(response.status);
+    }).catch(error => {
+        console.log(error);
+    });*/
+
+    backend.SaveStoreDeal('t05992', true, 'bafk2bzacectugewoaqpxcvl3ka5mpsq6wjqunfq3cyfjupsk7dpp5kiqut242', 'n/a', 0, '86f61cd1e84e491b4aec695f0274fd653b7363b4caccd7d5dc690e98001efc0e', 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
     });
 
-    backend.SaveStoreDeal('t04448', false, 'n/a', 'n/a', 0, 'test').then(response => {
+    backend.SaveRetrieveDeal('t05992', false, 'dataCid', 'dealCid', 100, 'bafk2bzacectugewoaqpxcvl3ka5mpsq6wjqunfq3cyfjupsk7dpp5kiqut242', 'test').then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
     });
 
-    backend.SaveRetrieveDeal('t04448', false, 'dataCid', 'dealCid', 100, 'test').then(response => {
-        console.log(response.data);
+    backend.GetCids(0).then(response => {
+        console.log('GetCids: ' + JSON.stringify(response.data));
         console.log(response.status);
     }).catch(error => {
         console.log(error);
