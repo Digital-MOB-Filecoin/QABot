@@ -6,7 +6,7 @@ const isIPFS = require('is-ipfs');
 const config = require('./config');
 const timestamp = require('time-stamp');
 const perf = require('execution-time')();
-const { FormatBytes, DealTimeout, TimeDifferenceInHours, Timeout } = require('./utils');
+const { FormatBytes, DealTimeout, TimeDifferenceInHours, TimeDifferenceInSeconds, Timeout } = require('./utils');
 const { BackendClient } = require('./backend')
 const { LotusWsClient } = require('./lotusws')
 const { version } = require('./package.json');
@@ -32,9 +32,10 @@ const FILE_SIZE_EXTRA_SMALL = 100;
 const FILE_SIZE_SMALL = 104857600;   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824;  //(1GB)
 const FILE_SIZE_LARGE = 5368709120;  // (5GB)
-const MAX_PENDING_STORAGE_DEALS = 100;
+const MAX_PENDING_STORAGE_DEALS = 10000;
 const MIN_DAILY_RATE = 5368709120; //5GB
 const MAX_DAILY_RATE = 268435456000; //250GB
+const HOUR = 3600;
 
 let backend;
 let slcHeight;
@@ -371,13 +372,18 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
     let outFile = RandomTestFilePath(config.bot.retrieve);
     const walletDefault = await lotus.WalletDefaultAddress();
     const wallet = walletDefault.result;
-    const findData = await lotus.ClientFindData(dataCid);
+    const queryOffer = await ClientMinerQueryOffer(retrieveDeal.miner, dataCid);
 
-    INFO("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
+    INFO(`ClientMinerQueryOffer [${retrieveDeal.miner},${dataCid}] ${JSON.stringify(queryOffer)}`);
 
-    const o = findData.result[0];
+    const o = queryOffer.result;
 
-    if (findData.result) {
+    if (queryOffer.result.Err) {
+        ERROR(`ClientMinerQueryOffer [${retrieveDeal.miner},${dataCid}] ${JSON.stringify(queryOffer)}`);
+        //FAILED -> send result to BE
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, 'ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
+  } else {
       const retrievalOffer = {
         Root: dataCid,
         Size: o.Size,
@@ -389,7 +395,9 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         MinerPeerID: o.MinerPeerID
       }
 
-      const timeoutPromise = Timeout(1*3600); // 1 hour lotus.ClientRetrieve timeout
+      const timeoutInSeconds = 1*3600; // 1 hour lotus.ClientRetrieve timeout
+
+      const timeoutPromise = Timeout(timeoutInSeconds);
       let data;
 
       pendingRetriveDealsMap.set(dataCid, {
@@ -410,7 +418,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
 
       if (data === 'timeout') {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';timeout');
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, 'timeout');
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
 
         statsRetrieveDealsFailed++;
         prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
@@ -447,12 +455,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
           retriveDealsMap.delete(dataCid);
         }
       }
-    } else {
-      ERROR("ClientFindData [" + dataCid + "] " + JSON.stringify(findData));
-      //FAILED -> send result to BE
-      FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';ClientFindData failed:' + JSON.stringify(findData));
-      backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, 'ClientFindData failed:' + JSON.stringify(findData));
-    }
+    } 
   } catch (e) {
     ERROR('Error: ' + e.message);
   }
@@ -634,7 +637,7 @@ async function RunRetriveDeals() {
      break;
 
     if (!pendingRetriveDealsMap.has(key)) {
-      RetrieveDeal(key, value, flags.cmdMode);
+      await RetrieveDeal(key, value, flags.cmdMode);
       await pause(1000);
     }
   }
@@ -704,7 +707,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
         //FAILED -> send result to BE
 
         FAILED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size + ';' + dealStates[data.result.State]);
-        backend.SaveStoreDeal(pendingStorageDeal.miner, false, pendingStorageDeal.dataCid, dealCid, pendingStorageDeal.size, dealStates[data.result.State]);
+        backend.SaveStoreDeal(pendingStorageDeal.miner, false, pendingStorageDeal.dataCid, dealCid, pendingStorageDeal.size, dealStates[data.result.State] + " ClientGetDealInfo: " + JSON.stringify(data));
 
         statsStorageDealsFailed++;
         prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
@@ -862,6 +865,7 @@ const mainLoop = async _ => {
   }
 
   while (!stop) {
+    const startLoop = Date.now();
     if (!flags.standalone_minerlist) {
       await LoadMiners();
     }
@@ -873,8 +877,13 @@ const mainLoop = async _ => {
     }
     await CheckPendingStorageDeals();
     await RunRetriveDeals();
-    await pause(2000);
 
+    const loopDuration = TimeDifferenceInSeconds(startLoop);
+    const sleepDuration =  (loopDuration < HOUR) ? (HOUR - loopDuration) : 30;
+
+    INFO(`loopDuration: ${loopDuration} Seconds sleepDuration: ${sleepDuration} Seconds`;
+
+    await pause(sleepDuration * 1000);
     PrintStats();
   }
 };

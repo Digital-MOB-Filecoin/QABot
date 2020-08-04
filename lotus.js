@@ -54,8 +54,16 @@ function ClientImport(file) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientImport", "params": [{"Path":file,"IsCAR":false}], "id": 0 }));
 }
 
+function ClientRemoveImport(importID) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientRemoveImport", "params": [importID], "id": 0 }));
+}
+
 function ClientFindData(dataCid) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientFindData", "params": [{"/":dataCid}, null], "id": 0 }));
+}
+
+function ClientMinerQueryOffer(miner, dataCid) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientMinerQueryOffer", "params": [miner, {"/":dataCid}, null], "id": 0 }));
 }
 
 function ClientRetrieve(retrievalOffer, outFile) {
@@ -223,8 +231,8 @@ if (args[0] === 'test-online') {
 
 if (args[0] === 'test-retrive') {
     //api = 'http://178.128.158.180:3999/rpc/v0'; // qabot3
-    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.cTVmgaA1YTMIhwcj-lPRwH0VALPpHojxPycZEP05bcY';// qabot2
-    //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.ev6YqAE4OkXaI7RGRpxKjalTdLltLI4T3tjWcBrON_c';// qabot2
+    api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
     //api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
 
 
@@ -232,15 +240,24 @@ if (args[0] === 'test-retrive') {
         const walletDefault = await WalletDefaultAddress();
         const wallet = walletDefault.result;
 
-        console.log(wallet);
+        console.log('wallet: ' + wallet);
 
-        const findData = await ClientFindData('bafk2bzacecswge2dwqtcaxixebfjpne3lmmbrd7puo5mxdotqhiflpk2kw3dg')
+        const dataCid = 'bafk2bzacec44djso5ir2o2xuwjlnvayiukkls3v4uw6ezhls5wcdwi4wwo2qy';
 
-        const o = findData.result[0];
+        const queryOffer = await ClientMinerQueryOffer('t04390', dataCid);
 
-        if (findData.result) {
+        console.log(JSON.stringify(queryOffer));
+
+        if (queryOffer.result.Err) {
+            console.error('ClientMinerQueryOffer:' + queryOffer.result.Err);
+            return;
+        }
+
+        const o = queryOffer.result;
+
+        if (queryOffer.result) {
             const retrievalOffer = {
-                Root: 'bafk2bzacecswge2dwqtcaxixebfjpne3lmmbrd7puo5mxdotqhiflpk2kw3dg',
+                Root: dataCid,
                 Size: o.Size,
                 Total: o.MinPrice,
                 PaymentInterval: o.PaymentInterval,
@@ -251,7 +268,7 @@ if (args[0] === 'test-retrive') {
             }
 
             ClientRetrieve(retrievalOffer,
-                '/root/retrieve/out3.data').then(data => {
+                '/root/out_r1.data').then(data => {
                 console.log(JSON.stringify(data));
             }).catch(error => {
                 console.log(error);
@@ -405,9 +422,11 @@ module.exports = {
     StateMinerInfo,
     ClientQueryAsk,
     ClientFindData,
+    ClientMinerQueryOffer,
     ClientGetDealInfo,
     ClientStartDeal,
     ClientImport,
+    ClientRemoveImport,
     ClientRetrieve,
     WalletDefaultAddress,
     NetConnectedness,
