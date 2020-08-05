@@ -91,7 +91,7 @@ class BackendClient {
             message: trimmedMessage,
             data_cid: dataCid,
             deal_cid: dealCid,
-            file_size: fileSize,
+            file_size: parseInt(fileSize),
             hash: hash
         };
 
