@@ -215,6 +215,10 @@ async function LoadRetrievalList() {
 
   INFO(`Total CidsList size ${tmpCidsList.length}`);
 
+  if (count == 0) {
+    return;
+  }
+
   const n = Math.ceil(tmpCidsList.length / config.bot.total);
   const index = config.bot.index;
 

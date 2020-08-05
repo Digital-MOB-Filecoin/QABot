@@ -4,9 +4,9 @@ module.exports = {
   bot: {
     import: process.env.BOT_IMPORT_PATH || '/root/import/',
     retrieve: process.env.BOT_RETRIEVE_PATH || '/root/retrieve/',
-    mode: process.env.BOT_MODE || 'retrieve', // or retrieve
+    mode: process.env.BOT_MODE || 'store', // or retrieve
     index: process.env.BOT_INDEX || 0, // current bot index
-    total: process.env.BOT_TOTAL || 2, // total number of bots
+    total: process.env.BOT_TOTAL || 1, // total number of bots
   },
   backend_dev: {
     api: process.env.BACKEND_API || 'https://competition-backend.dev.interplanetary.one/api/',
