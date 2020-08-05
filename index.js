@@ -457,7 +457,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         MinerPeerID: o.MinerPeerID
       }
 
-      const timeoutInSeconds = 1*60;//1*3600; // 1 hour lotus.ClientRetrieve timeout
+      const timeoutInSeconds = 1*3600; // 1 hour lotus.ClientRetrieve timeout
 
       const timeoutPromise = Timeout(timeoutInSeconds);
       let data;
