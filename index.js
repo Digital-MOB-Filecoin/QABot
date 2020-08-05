@@ -213,9 +213,28 @@ async function LoadRetrievalList() {
   }
   while (tmpCidsList.length < count);
 
-  if (tmpCidsList.length) {
-    cidsList.length = 0;
-    cidsList = [...tmpCidsList];
+  INFO(`Total CidsList size ${tmpCidsList.length}`);
+
+  const n = Math.ceil(tmpCidsList.length / config.bot.total);
+  const index = config.bot.index;
+
+  INFO(`Split CidsList in ${config.bot.total} parts current bot index ${index}`);
+
+  const result = new Array(Math.ceil(tmpCidsList.length / n))
+  .fill()
+  .map(_ => tmpCidsList.splice(0, n))
+
+  let i = 0;
+  result.forEach(v => {
+    INFO (`Bot ${i} splice ${v.length}`);
+    i++;
+  });
+
+  //clear cidsList
+  cidsList.length = 0;
+
+  if (result[index].length) {
+    cidsList = [...result[index]];
   }
 
   INFO("cidsList: " + cidsList.length);
@@ -425,7 +444,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         ERROR(`ClientMinerQueryOffer [${retrieveDeal.miner},${dataCid}] ${JSON.stringify(queryOffer)}`);
         //FAILED -> send result to BE
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, 'ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
+        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', parseInt(retrieveDeal.size), retrieveDeal.fileHash, 'ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
   } else {
       const retrievalOffer = {
         Root: dataCid,
@@ -458,7 +477,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       INFO(JSON.stringify(data));
 
       pendingRetriveDealsMap.delete(dataCid);
-      //backend.DeleteCid(dataCid);
+      backend.DeleteCid(dataCid);
 
       if (data === 'timeout') {
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
