@@ -19,6 +19,10 @@ function TimeDifferenceInHours(timestamp) {
     return (Math.abs(Date.now() - timestamp) / (1000 * 3600)).toFixed();
 }
 
+function TimeDifferenceInSeconds(timestamp) {
+    return (Math.abs(Date.now() - timestamp) / (1000)).toFixed();
+}
+
 function Timeout(seconds) {
     return new Promise((resolve, reject) => {
         setTimeout(() => {
@@ -31,5 +35,6 @@ module.exports = {
     FormatBytes,
     DealTimeout,
     TimeDifferenceInHours,
+    TimeDifferenceInSeconds,
     Timeout,
 };
