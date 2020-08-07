@@ -693,6 +693,7 @@ async function RunRetriveDeals() {
     if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
       await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
       await pause(1000);
+      it++;
     }
   }
 }
