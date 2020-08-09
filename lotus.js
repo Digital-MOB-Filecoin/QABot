@@ -67,7 +67,7 @@ function ClientMinerQueryOffer(miner, dataCid) {
 }
 
 function ClientRetrieve(retrievalOffer, outFile) {
-    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientRetrieve", "params": [{"Root":{"/":retrievalOffer.Root},"Size":retrievalOffer.Size, "Total":retrievalOffer.Total, "PaymentInterval":retrievalOffer.PaymentInterval, "PaymentIntervalIncrease":retrievalOffer.PaymentIntervalIncrease, "Client": retrievalOffer.Client, "Miner":retrievalOffer.Miner, "MinerPeerID":retrievalOffer.MinerPeerID},{"Path":outFile,"IsCAR":false}], "id": 0 }));
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientRetrieve", "params": [retrievalOffer,{"Path":outFile,"IsCAR":false}], "id": 0 }));
 }
 
 function StateMinerSectorCount(miner) {
@@ -231,8 +231,8 @@ if (args[0] === 'test-online') {
 
 if (args[0] === 'test-retrive') {
     //api = 'http://178.128.158.180:3999/rpc/v0'; // qabot3
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.ev6YqAE4OkXaI7RGRpxKjalTdLltLI4T3tjWcBrON_c';// qabot2
-    api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
+    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.ev6YqAE4OkXaI7RGRpxKjalTdLltLI4T3tjWcBrON_c';// qabot2
+    //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
     //api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
 
 
@@ -242,9 +242,9 @@ if (args[0] === 'test-retrive') {
 
         console.log('wallet: ' + wallet);
 
-        const dataCid = 'bafk2bzacec44djso5ir2o2xuwjlnvayiukkls3v4uw6ezhls5wcdwi4wwo2qy';
+        const dataCid = 'bafk2bzacecpmbkxwrhz6umt6rai47mh4wv6zod4cyb5tb6iyqmjy2q4pw4r3u';
 
-        const queryOffer = await ClientMinerQueryOffer('t04390', dataCid);
+        const queryOffer = await ClientMinerQueryOffer('t01857', dataCid);
 
         console.log(JSON.stringify(queryOffer));
 
@@ -257,15 +257,17 @@ if (args[0] === 'test-retrive') {
 
         if (queryOffer.result) {
             const retrievalOffer = {
-                Root: dataCid,
+                Root: o.Root,
+                Piece: null,
                 Size: o.Size,
                 Total: o.MinPrice,
+                UnsealPrice: o.UnsealPrice,
                 PaymentInterval: o.PaymentInterval,
                 PaymentIntervalIncrease: o.PaymentIntervalIncrease,
                 Client: wallet,
                 Miner: o.Miner,
-                MinerPeerID: o.MinerPeerID
-            }
+                MinerPeer: o.MinerPeer
+              }
 
             ClientRetrieve(retrievalOffer,
                 '/root/out_r1.data').then(data => {
