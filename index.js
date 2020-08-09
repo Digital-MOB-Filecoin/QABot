@@ -167,11 +167,16 @@ function GenerateTestFile(filePath, size) {
   return testFileHash;
 }
 
-function DeleteTestFile(filename) {
+async function DeleteTestFile(filename, importID = 0) {
   try {
     if (fs.existsSync(filename)) {
-      //fs.unlinkSync(filename);
-      //INFO("DeleteTestFile : " + filename);
+      if (importID > 0) {
+        const result = await lotus.ClientRemoveImport(importID);
+        INFO(`ClientRemoveImport[${importID}] ${JSON.stringify(result)}`);
+      }
+
+      fs.unlinkSync(filename);
+      INFO("DeleteTestFile : " + filename);
     }
   } catch (err) {
     ERROR(err)
@@ -357,17 +362,19 @@ async function StorageDeal(minerData, cmdMode = false) {
     var fileHash = GenerateTestFile(filePath, size);
 
     let parseImportData;
+    let importID = 0;
     const importData = await lotus.ClientImport(filePath);
 
     if (importData && importData.result && importData.result.Root) {
       parseImportData = importData.result.Root;
+      importID = importData.result.ImportID;
     } else if (importData && importData.result) {
       parseImportData = importData.result;
     }
 
     if (!parseImportData) {
       ERROR('ClientImport failed: ' + JSON.stringify(importData));
-      DeleteTestFile(filePath);
+      DeleteTestFile(filePath, importID);
       return;
     }
 
@@ -419,6 +426,7 @@ async function StorageDeal(minerData, cmdMode = false) {
     if (!storageDealsMap.has(dealCid)) {
       storageDealsMap.set(dealCid, {
         dataCid: dataCid,
+        importID: importID,
         miner: miner,
         filePath: filePath,
         fileHash: fileHash,
@@ -712,7 +720,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
         statsStorageDealsSuccessful++;
         prometheus.SetSuccessfulStorageDeals(statsStorageDealsSuccessful);
 
-        DeleteTestFile(pendingStorageDeal.filePath);
+        DeleteTestFile(pendingStorageDeal.filePath, pendingStorageDeal.importID);
 
         //PASSED -> send result to BE [dealcid;datacid;size]
         PASSED('StoreDeal', pendingStorageDeal.miner, dealCid + ';' + pendingStorageDeal.dataCid + ';' + pendingStorageDeal.size);
@@ -738,12 +746,12 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
           minersMap.set(pendingStorageDeal.miner, minerData);
         }
 
-        DeleteTestFile(pendingStorageDeal.filePath);
+        DeleteTestFile(pendingStorageDeal.filePath, pendingStorageDeal.importID);
         storageDealsMap.delete(dealCid);
       } else if (dealStates[data.result.State] == "StorageDealStaged") {
-        DeleteTestFile(pendingStorageDeal.filePath);
+        DeleteTestFile(pendingStorageDeal.filePath, pendingStorageDeal.importID);
       } else if (dealStates[data.result.State] == "StorageDealSealing") {
-        DeleteTestFile(pendingStorageDeal.filePath);
+        DeleteTestFile(pendingStorageDeal.filePath, pendingStorageDeal.importID);
       } else if (dealStates[data.result.State] == "StorageDealError") {
         //FAILED -> send result to BE
 
@@ -752,7 +760,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
 
         statsStorageDealsFailed++;
         prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
-        DeleteTestFile(pendingStorageDeal.filePath);
+        DeleteTestFile(pendingStorageDeal.filePath, pendingStorageDeal.importID);
         storageDealsMap.delete(dealCid);
       } else if (DealTimeout(pendingStorageDeal.timestamp)) {
         //FAILED -> send result to BE
@@ -761,7 +769,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
 
         statsStorageDealsFailed++;
         prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
-        DeleteTestFile(pendingStorageDeal.filePath);
+        DeleteTestFile(pendingStorageDeal.filePath, pendingStorageDeal.importID);
         storageDealsMap.delete(dealCid);
       }
     } else {
