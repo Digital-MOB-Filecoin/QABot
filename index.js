@@ -184,6 +184,9 @@ async function LoadRetrievalList() {
   let count = 0;
   let skip = 0;
 
+  //clear cidsList
+  cidsList.length = 0;
+
   do {
     await backend.GetCids(skip).then(response => {
       if (response.status == 200 && response.data && response.data.items) {
@@ -233,9 +236,6 @@ async function LoadRetrievalList() {
     INFO (`Bot ${i} splice ${v.length}`);
     i++;
   });
-
-  //clear cidsList
-  cidsList.length = 0;
 
   if (result[index].length) {
     cidsList = [...result[index]];
