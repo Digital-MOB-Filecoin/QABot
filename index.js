@@ -451,14 +451,16 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', parseInt(retrieveDeal.size), retrieveDeal.fileHash, 'ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
   } else {
       const retrievalOffer = {
-        Root: dataCid,
+        Root: o.Root,
+        Piece: null,
         Size: o.Size,
         Total: o.MinPrice,
+        UnsealPrice: o.UnsealPrice,
         PaymentInterval: o.PaymentInterval,
         PaymentIntervalIncrease: o.PaymentIntervalIncrease,
         Client: wallet,
         Miner: o.Miner,
-        MinerPeerID: o.MinerPeerID
+        MinerPeer: o.MinerPeer
       }
 
       const timeoutInSeconds = 12*3600; // 1 hour lotus.ClientRetrieve timeout
