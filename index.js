@@ -461,7 +461,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         MinerPeerID: o.MinerPeerID
       }
 
-      const timeoutInSeconds = 1*3600; // 1 hour lotus.ClientRetrieve timeout
+      const timeoutInSeconds = 12*3600; // 1 hour lotus.ClientRetrieve timeout
 
       const timeoutPromise = Timeout(timeoutInSeconds);
       let data;
@@ -471,49 +471,46 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         timestamp: Date.now()
       })
 
-      if (cmdMode) {
-        const response = await Promise.race([lotus.ClientRetrieveCmd(retrieveDeal.miner, dataCid, outFile), timeoutPromise]);
-        data = RemoveLineBreaks(response);
-      } else {
-        data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
-      }
 
-      INFO(JSON.stringify(data));
+      Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]).then(data => {
+        INFO(JSON.stringify(data));
 
-      pendingRetriveDealsMap.delete(dataCid);
-      backend.DeleteCid(dataCid);
+        pendingRetriveDealsMap.delete(dataCid);
+        backend.DeleteCid(dataCid);
 
-      if (data === 'timeout') {
-        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
-
-        statsRetrieveDealsFailed++;
-        prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
-      } else if (data.error) {
-        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';' + JSON.stringify(data.error));
-        backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, JSON.stringify(data.error) + ' ClientMinerQueryOffer: ' + JSON.stringify(queryOffer));
-
-        statsRetrieveDealsFailed++;
-        prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
-      } else {
-        var hash = SHA256FileSync(outFile);
-        INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
-        if (hash == retrieveDeal.fileHash) {
-          //PASSED -> send result to BE
-          PASSED('RetrieveDeal', retrieveDeal.miner, dataCid + ';success outFile:' + outFile + 'sha256:' + hash);
-          backend.SaveRetrieveDeal(retrieveDeal.miner, true, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, 'success');
-
-          statsRetrieveDealsSuccessful++;
-          prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
-        } else {
-          //FAILED -> send result to BE
-          FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
-          backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, 'hash check failed sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
+        if (data === 'timeout') {
+          FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
+          backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
 
           statsRetrieveDealsFailed++;
           prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
+        } else if (data.error) {
+          FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';' + JSON.stringify(data.error));
+          backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, JSON.stringify(data.error) + ' ClientMinerQueryOffer: ' + JSON.stringify(queryOffer));
+
+          statsRetrieveDealsFailed++;
+          prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
+        } else {
+          var hash = SHA256FileSync(outFile);
+          INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
+          if (hash == retrieveDeal.fileHash) {
+            //PASSED -> send result to BE
+            PASSED('RetrieveDeal', retrieveDeal.miner, dataCid + ';success outFile:' + outFile + 'sha256:' + hash);
+            backend.SaveRetrieveDeal(retrieveDeal.miner, true, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, 'success');
+
+            statsRetrieveDealsSuccessful++;
+            prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
+          } else {
+            //FAILED -> send result to BE
+            FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
+            backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', retrieveDeal.size, retrieveDeal.fileHash, 'hash check failed sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
+
+            statsRetrieveDealsFailed++;
+            prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
+          }
         }
-      }
+
+      });
     } 
   } catch (e) {
     ERROR('Error: ' + e.message);
@@ -695,8 +692,9 @@ async function RunRetriveDeals() {
   while (!stop && (it < cidsList.length)) {
     if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
       await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
-      await pause(1000);
     }
+    await pause(1000);
+    it++;
   }
 }
 
