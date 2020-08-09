@@ -692,9 +692,9 @@ async function RunRetriveDeals() {
   while (!stop && (it < cidsList.length)) {
     if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
       await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
-      await pause(1000);
-      it++;
     }
+    await pause(1000);
+    it++;
   }
 }
 
