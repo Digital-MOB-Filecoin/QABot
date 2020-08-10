@@ -434,6 +434,11 @@ async function StorageDeal(minerData, cmdMode = false) {
 async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
   INFO("RetrieveDeal [" + dataCid + "]");
 
+  pendingRetriveDealsMap.set(dataCid, {
+    miner: retrieveDeal.miner,
+    timestamp: Date.now()
+  });
+
   try {
     let outFile = RandomTestFilePath(config.bot.retrieve);
     const walletDefault = await lotus.WalletDefaultAddress();
@@ -467,12 +472,6 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
 
       const timeoutPromise = Timeout(timeoutInSeconds);
       let data;
-
-      pendingRetriveDealsMap.set(dataCid, {
-        miner: retrieveDeal.miner,
-        timestamp: Date.now()
-      })
-
 
       Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]).then(data => {
         INFO(JSON.stringify(data));
@@ -515,6 +514,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       });
     } 
   } catch (e) {
+    pendingRetriveDealsMap.delete(dataCid);
     ERROR('Error: ' + e.message);
   }
 }
