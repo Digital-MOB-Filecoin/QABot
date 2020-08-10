@@ -454,7 +454,11 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         //FAILED -> send result to BE
         FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
         backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', parseInt(retrieveDeal.size), retrieveDeal.fileHash, 'ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
-  } else {
+  
+        pendingRetriveDealsMap.delete(dataCid);
+        const beResponse = await backend.DeleteCid(dataCid);
+        INFO(`BE DeleteCid: ${JSON.stringify(beResponse)}`);
+      } else {
       const retrievalOffer = {
         Root: o.Root,
         Piece: null,
@@ -473,7 +477,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       const timeoutPromise = Timeout(timeoutInSeconds);
       let data;
 
-      Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]).then(data => {
+      Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]).then(async data => {
         INFO(JSON.stringify(data));
 
         pendingRetriveDealsMap.delete(dataCid);
