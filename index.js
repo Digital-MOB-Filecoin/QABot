@@ -456,8 +456,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         backend.SaveRetrieveDeal(retrieveDeal.miner, false, dataCid, 'n/a', parseInt(retrieveDeal.size), retrieveDeal.fileHash, 'ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
   
         pendingRetriveDealsMap.delete(dataCid);
-        const beResponse = await backend.DeleteCid(dataCid);
-        INFO(`BE DeleteCid: ${JSON.stringify(beResponse)}`);
+        await backend.DeleteCid(dataCid);
       } else {
       const retrievalOffer = {
         Root: o.Root,
@@ -481,8 +480,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         INFO(JSON.stringify(data));
 
         pendingRetriveDealsMap.delete(dataCid);
-        const beResponse = await backend.DeleteCid(dataCid);
-        INFO(`BE DeleteCid: ${JSON.stringify(beResponse)}`);
+        await backend.DeleteCid(dataCid);
 
         if (data === 'timeout') {
           FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
