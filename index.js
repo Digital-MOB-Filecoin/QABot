@@ -477,7 +477,8 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         INFO(JSON.stringify(data));
 
         pendingRetriveDealsMap.delete(dataCid);
-        backend.DeleteCid(dataCid);
+        const beResponse = await backend.DeleteCid(dataCid);
+        INFO(`BE DeleteCid: ${JSON.stringify(beResponse)}`);
 
         if (data === 'timeout') {
           FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
@@ -937,7 +938,7 @@ const mainLoopRetrieve = async _ => {
   while (!stop) {
     await LoadRetrievalList();
     await RunRetriveDeals();
-    await pause(30 * 1000);
+    await pause(120 * 1000); // 2 min
     PrintRetrievalStats();
   }
 };
