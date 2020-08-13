@@ -342,6 +342,33 @@ function CalculateStorageDealPrice(askPrice) {
   return x.dividedBy(y).toString(10);
 }
 
+async function CheckBalance() {
+  const BigNumber = require('bignumber.js');
+  let toFIL = new BigNumber(1000000000000000000);
+  let minBalanceInFIL = new BigNumber(1000);
+
+  try {
+    const walletDefault = await lotus.WalletDefaultAddress();
+    const wallet = walletDefault.result;
+    const balance = await lotus.WalletBalance(wallet);
+
+    let currentBalance = new BigNumber(balance.result);
+    let currentBalanceInFIL = currentBalance.dividedBy(toFIL);
+
+    if (currentBalanceInFIL.comparedTo(minBalanceInFIL) != 1) {
+      ERROR(`Balance Too Low current : ${currentBalanceInFIL.toString(10)} min : ${minBalanceInFIL.toString(10)} wallet: ${wallet}`);
+      return false;
+    }
+
+    INFO(`Current Balance: ${currentBalanceInFIL.toString(10)} FIL  wallet: ${wallet}`);
+  } catch (error) {
+    ERROR('CheckBalance: ' + error);
+    return false;
+  }
+
+  return true;
+}
+
 async function StorageDeal(minerData, cmdMode = false) {
   try {
     let miner = minerData.address;
@@ -922,6 +949,10 @@ const mainLoopStore = async _ => {
   }
 
   while (!stop) {
+    if (!await CheckBalance()) {
+      await pause(30 * 1000);
+      continue;
+    }
     const startLoop = Date.now();
     if (!flags.standalone_minerlist) {
       await LoadMiners();
@@ -947,6 +978,10 @@ const mainLoopStore = async _ => {
 
 const mainLoopRetrieve = async _ => {
   while (!stop) {
+    if (!await CheckBalance()) {
+      await pause(30 * 1000);
+      continue;
+    }
     await LoadRetrievalList();
     await RunRetriveDeals();
     await pause(120 * 1000); // 2 min

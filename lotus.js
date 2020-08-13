@@ -130,9 +130,35 @@ function ChainGetMessage(messageCid) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetMessage", "params": [messageCid], "id": 0 }));
 }
 
-//WalletBalance(context.Context, address.Address) (types.BigInt, error)
+function WalletBalance(wallet) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.WalletBalance", "params": [wallet], "id": 0 }));
+}
 
 var args = process.argv.slice(2);
+
+if (args[0] === 'test-balance') {
+    api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
+    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.qJO3-Y_GGW0jnbN-xKlaP4KOIAR-buez1yLI_EZrfTw';// qabot2
+
+    (async () => {
+        const walletDefault = await WalletDefaultAddress();
+        const wallet = walletDefault.result;
+
+        console.log('wallet: ' + wallet);
+
+        const w2 = 't1siyoql22zryui54bo6ht36w4k3slb5yi4oj53sa';
+
+        const balance = await WalletBalance(wallet);
+
+        const BigNumber = require('bignumber.js');
+
+        let x = new BigNumber(balance.result);
+        let y = new BigNumber(1000000000000000000);
+        console.log(x.dividedBy(y).toString(10));
+
+        console.log(balance.result);
+    })();
+}
 
 if (args[0] === 'test-slc') {
     var cbor = require('cbor');
@@ -443,4 +469,5 @@ module.exports = {
     ChainGetTipSet,
     ChainGetNode,
     ChainGetMessage,
+    WalletBalance,
 };
