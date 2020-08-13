@@ -101,6 +101,7 @@ class LotusWsClient {
             Miner: miner,
             EpochPrice: `${price}`,
             MinBlocksDuration: duration,
+            FastRetrieval: true
         }]
         );
     }

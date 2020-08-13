@@ -130,6 +130,8 @@ function ChainGetMessage(messageCid) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetMessage", "params": [messageCid], "id": 0 }));
 }
 
+//WalletBalance(context.Context, address.Address) (types.BigInt, error)
+
 var args = process.argv.slice(2);
 
 if (args[0] === 'test-slc') {
@@ -375,7 +377,8 @@ if (args[0] === 'test-store') {
                 Wallet: wallet,
                 Miner: miner,
                 EpochPrice: epochPrice,
-                MinBlocksDuration: 10000
+                MinBlocksDuration: 10000,
+                FastRetrieval: true
             }
 
             const dealData = await ClientStartDeal(dataRef);

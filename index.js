@@ -404,7 +404,8 @@ async function StorageDeal(minerData, cmdMode = false) {
         Wallet: wallet,
         Miner: miner,
         EpochPrice: epochPrice,
-        MinBlocksDuration: 700000
+        MinBlocksDuration: 700000,
+        FastRetrieval: true
       }
 
       const dealData = await lotus.ClientStartDeal(dataRef);
