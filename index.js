@@ -137,8 +137,13 @@ function RandomTestFilePath(basePath) {
   return uniqueFilename(basePath, 'qab-testfile');
 }
 
+function getRandomInt(max) {
+  return Math.floor(Math.random() * Math.floor(max));
+}
+
 function RandomTestFileSize() {
-  return flags.size;
+  const sizes = [FILE_SIZE_EXTRA_SMALL, FILE_SIZE_SMALL, FILE_SIZE_MEDIUM];
+  return sizes[getRandomInt(sizes.length)];
 }
 
 function GenerateTestFile(filePath, size) {
@@ -382,8 +387,9 @@ async function StorageDeal(minerData, cmdMode = false) {
     var size = RandomTestFileSize();
 
     if (size > sectorSize) {
-      ERROR(`GenerateTestFile size: ${FormatBytes(size)} > SectorSize: ${FormatBytes(sectorSize)}`);
-      size = sectorSize / 2; // TODO remove
+      WARNING(`GenerateTestFile size: ${FormatBytes(size)} > SectorSize: ${FormatBytes(sectorSize)}`);
+      size = sectorSize / 2;
+      INFO(`GenerateTestFile use new size: ${FormatBytes(size)}`);
     }
 
     var fileHash = GenerateTestFile(filePath, size);
