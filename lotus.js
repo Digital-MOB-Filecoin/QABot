@@ -478,4 +478,5 @@ module.exports = {
     ChainGetNode,
     ChainGetMessage,
     WalletBalance,
+    ClientDealSize,
 };
