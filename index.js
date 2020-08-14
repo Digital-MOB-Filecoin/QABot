@@ -339,13 +339,15 @@ async function LoadMiners() {
   }
 }
 
-function CalculateStorageDealPrice(askPrice) {
+function CalculateStorageDealPrice(askPrice, pieceSize) {
   const BigNumber = require('bignumber.js');
 
-  let x = new BigNumber(askPrice);
-  let y = new BigNumber(1000000000000000000);
-  let z = x.dividedBy(y);
-  return z.multipliedBy(2).toString(10);
+  let ask = new BigNumber(askPrice).multipliedBy(pieceSize);
+  let gib = 1 << 30;
+
+  let epochPrice = ask.dividedBy(gib);
+
+  return epochPrice.toString(10);
 }
 
 async function CheckBalance() {
@@ -415,17 +417,22 @@ async function StorageDeal(minerData, cmdMode = false) {
     const { '/': dataCid } = parseImportData;
     INFO("ClientImport : " + JSON.stringify(importData));
 
+    const dealSize = await lotus.ClientDealSize("bafykbzacec2mek5eduoz6doe46ta34oomyimd2fsolc7daqsbxv6pb75ska4q");
+
+    INFO('DealSize: ' + JSON.stringify(dealSize));
+    const pieceSize = dealSize.result.PieceSize;
+
     let dealCid;
 
-    INFO("Run ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(minerData.price) + " 700000");
+    INFO("Run ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(minerData.price, pieceSize) + " 700000");
 
     if (cmdMode) {
-      var response = await lotus.ClientStartDealCmd(dataCid, miner, CalculateStorageDealPrice(minerData.price), '700000');
+      var response = await lotus.ClientStartDealCmd(dataCid, miner, CalculateStorageDealPrice(minerData.price, pieceSize), '700000');
       dealCid = RemoveLineBreaks(response);
     } else {
       const walletDefault = await lotus.WalletDefaultAddress();
       const wallet = walletDefault.result;
-      const epochPrice = CalculateStorageDealPrice(minerData.price);
+      const epochPrice = CalculateStorageDealPrice(minerData.price, pieceSize);
 
       const dataRef = {
         Data: {
