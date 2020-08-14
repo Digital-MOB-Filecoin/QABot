@@ -143,7 +143,8 @@ function getRandomInt(max) {
 
 function RandomTestFileSize() {
   const sizes = [FILE_SIZE_EXTRA_SMALL, FILE_SIZE_SMALL, FILE_SIZE_MEDIUM];
-  return sizes[getRandomInt(sizes.length)];
+  //return sizes[getRandomInt(sizes.length)];
+  return FILE_SIZE_EXTRA_SMALL;
 }
 
 function GenerateTestFile(filePath, size) {
@@ -344,8 +345,7 @@ function CalculateStorageDealPrice(askPrice) {
 
   let x = new BigNumber(askPrice);
   let y = new BigNumber(1000000000000000000);
-  let z = x.dividedBy(y);
-  return z.multipliedBy(2).toString(10);
+  return x.dividedBy(y).toString(10);
 }
 
 async function CheckBalance() {
