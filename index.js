@@ -417,7 +417,7 @@ async function StorageDeal(minerData, cmdMode = false) {
     const { '/': dataCid } = parseImportData;
     INFO("ClientImport : " + JSON.stringify(importData));
 
-    const dealSize = await lotus.ClientDealSize("bafykbzacec2mek5eduoz6doe46ta34oomyimd2fsolc7daqsbxv6pb75ska4q");
+    const dealSize = await lotus.ClientDealSize(dataCid);
 
     INFO('DealSize: ' + JSON.stringify(dealSize));
     const pieceSize = dealSize.result.PieceSize;

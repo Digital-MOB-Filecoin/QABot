@@ -7,7 +7,7 @@ mkdir ~/import
 mkdir ~/retrieve
 
 export BOT_MODE="store"
-node index.js --size 100 &> ~/qab-store.log &
+node index.js &> ~/qab-store.log &
 disown -r
 
 export BOT_MODE="retrieve"
