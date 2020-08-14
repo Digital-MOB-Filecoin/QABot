@@ -344,7 +344,8 @@ function CalculateStorageDealPrice(askPrice) {
 
   let x = new BigNumber(askPrice);
   let y = new BigNumber(1000000000000000000);
-  return x.dividedBy(y).toString(10);
+  let z = x.dividedBy(y);
+  return z.multipliedBy(2).toString(10);
 }
 
 async function CheckBalance() {
