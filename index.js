@@ -345,7 +345,7 @@ function CalculateStorageDealPrice(askPrice, pieceSize) {
   let ask = new BigNumber(askPrice).multipliedBy(pieceSize);
   let gib = 1 << 30;
 
-  let epochPrice = ask.dividedBy(gib);
+  let epochPrice = ask.dividedBy(gib).decimalPlaces(0);
 
   return epochPrice.toString(10);
 }
@@ -423,6 +423,8 @@ async function StorageDeal(minerData, cmdMode = false) {
     const pieceSize = dealSize.result.PieceSize;
 
     let dealCid;
+
+    INFO(`Miner[${miner}] ask price: ${minerData.price}  epochPrice: ${CalculateStorageDealPrice(minerData.price, pieceSize)}`);
 
     INFO("Run ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(minerData.price, pieceSize) + " 700000");
 
