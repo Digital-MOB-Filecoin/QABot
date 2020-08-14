@@ -17,8 +17,8 @@ module.exports = {
     token: process.env.BACKEND_TOKEN || 'eyJpZCI6Miwic2VydmljZV90b2tlbiI6IkRYMm5KbUJ0SGZTNFN5OXAifQ==',
   },
   lotus: {
-    api: process.env.LOTUS_API || 'http://104.248.116.108:3999/rpc/v0',
-    token: process.env.LOTUS_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.ev6YqAE4OkXaI7RGRpxKjalTdLltLI4T3tjWcBrON_c',
+    api: process.env.LOTUS_API || 'http://64.227.17.40:1234/rpc/v0',
+    token: process.env.LOTUS_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.qjzwrdDtfrTGqBP0vYMdmQhV29_X--yHHtb6wXmDuf0',
   },
   prometheus: {
     api: process.env.PUSHGATEWAY_API || 'http://127.0.0.1:9091',

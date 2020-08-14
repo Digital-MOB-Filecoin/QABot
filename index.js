@@ -143,8 +143,7 @@ function getRandomInt(max) {
 
 function RandomTestFileSize() {
   const sizes = [FILE_SIZE_EXTRA_SMALL, FILE_SIZE_SMALL, FILE_SIZE_MEDIUM];
-  //return sizes[getRandomInt(sizes.length)];
-  return FILE_SIZE_EXTRA_SMALL;
+  return sizes[getRandomInt(sizes.length)];
 }
 
 function GenerateTestFile(filePath, size) {
@@ -340,12 +339,15 @@ async function LoadMiners() {
   }
 }
 
-function CalculateStorageDealPrice(askPrice) {
+function CalculateStorageDealPrice(askPrice, pieceSize) {
   const BigNumber = require('bignumber.js');
 
-  let x = new BigNumber(askPrice);
-  let y = new BigNumber(1000000000000000000);
-  return x.dividedBy(y).toString(10);
+  let ask = new BigNumber(askPrice).multipliedBy(pieceSize);
+  let gib = 1 << 30;
+
+  let epochPrice = ask.dividedBy(gib).decimalPlaces(0);
+
+  return epochPrice.toString(10);
 }
 
 async function CheckBalance() {
@@ -415,16 +417,24 @@ async function StorageDeal(minerData, cmdMode = false) {
     const { '/': dataCid } = parseImportData;
     INFO("ClientImport : " + JSON.stringify(importData));
 
+    const dealSize = await lotus.ClientDealSize(dataCid);
+
+    INFO('DealSize: ' + JSON.stringify(dealSize));
+    const pieceSize = dealSize.result.PieceSize;
+
     let dealCid;
 
+    INFO(`Miner[${miner}] ask price: ${minerData.price}  epochPrice: ${CalculateStorageDealPrice(minerData.price, pieceSize)}`);
+
+    INFO("Run ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(minerData.price, pieceSize) + " 700000");
+
     if (cmdMode) {
-      INFO("Before ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(minerData.price) + " 700000");
-      var response = await lotus.ClientStartDealCmd(dataCid, miner, CalculateStorageDealPrice(minerData.price), '700000');
+      var response = await lotus.ClientStartDealCmd(dataCid, miner, CalculateStorageDealPrice(minerData.price, pieceSize), '700000');
       dealCid = RemoveLineBreaks(response);
     } else {
       const walletDefault = await lotus.WalletDefaultAddress();
       const wallet = walletDefault.result;
-      const epochPrice = minerData.price;
+      const epochPrice = CalculateStorageDealPrice(minerData.price, pieceSize);
 
       const dataRef = {
         Data: {

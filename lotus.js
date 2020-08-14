@@ -134,13 +134,21 @@ function WalletBalance(wallet) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.WalletBalance", "params": [wallet], "id": 0 }));
 }
 
+function ClientDealSize(dataCid) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientDealSize", "params": [{"/":dataCid}], "id": 0 }));
+}
+
 var args = process.argv.slice(2);
 
 if (args[0] === 'test-balance') {
-    api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.qJO3-Y_GGW0jnbN-xKlaP4KOIAR-buez1yLI_EZrfTw';// qabot2
+    //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
+    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.qJO3-Y_GGW0jnbN-xKlaP4KOIAR-buez1yLI_EZrfTw';// qabot2
 
     (async () => {
+        const dealSize = await ClientDealSize("bafykbzacec2mek5eduoz6doe46ta34oomyimd2fsolc7daqsbxv6pb75ska4q");
+
+        console.log(dealSize);
+
         const walletDefault = await WalletDefaultAddress();
         const wallet = walletDefault.result;
 
@@ -470,4 +478,5 @@ module.exports = {
     ChainGetNode,
     ChainGetMessage,
     WalletBalance,
+    ClientDealSize,
 };
