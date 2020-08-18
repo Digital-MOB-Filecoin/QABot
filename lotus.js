@@ -138,7 +138,23 @@ function ClientDealSize(dataCid) {
     return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ClientDealSize", "params": [{"/":dataCid}], "id": 0 }));
 }
 
+function StateGetActor(address, tipSetKey) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.StateGetActor", "params": [address, tipSetKey], "id": 0 }));
+}
+
+function ChainGetParentMessages(blockCid) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetParentMessages", "params": [{"/":blockCid}], "id": 0 }));
+}
+
+function ChainGetParentReceipts(blockCid) {
+    return LotusCmd(JSON.stringify({ "jsonrpc": "2.0", "method": "Filecoin.ChainGetParentReceipts", "params": [{"/":blockCid}], "id": 0 }));
+}
+
 var args = process.argv.slice(2);
+
+function SLCRange(start, end) {
+    return Array(end - start + 1).fill().map((_, idx) => start + idx)
+}
 
 if (args[0] === 'test-balance') {
     //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
@@ -168,11 +184,27 @@ if (args[0] === 'test-balance') {
     })();
 }
 
+/*
+type SectorPreCommitInfo struct {
+	SealProof       abi.RegisteredSealProof
+	SectorNumber    abi.SectorNumber
+	SealedCID       cid.Cid `checked:"true"` // CommR
+	SealRandEpoch   abi.ChainEpoch
+	DealIDs         []abi.DealID
+	Expiration      abi.ChainEpoch
+	ReplaceCapacity bool // Whether to replace a "committed capacity" no-deal sector (requires non-empty DealIDs)
+	// The committed capacity sector to replace, and it's deadline/partition location
+	ReplaceSectorDeadline  uint64
+	ReplaceSectorPartition uint64
+	ReplaceSectorNumber    abi.SectorNumber
+}
+*/
+
 if (args[0] === 'test-slc') {
     var cbor = require('cbor');
 
-    api = 'http://104.248.116.108:1234/rpc/v0'; // qabot2
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.b4J6r2hB4FTgHicCUEJZhZzDn9et3Zhqwh8DiNkgxcQ';// qabot2
+    //api = 'http://104.248.116.108:1234/rpc/v0'; // qabot2
+    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.b4J6r2hB4FTgHicCUEJZhZzDn9et3Zhqwh8DiNkgxcQ';// qabot2
 
     (async () => {
         const result = [];
@@ -182,39 +214,48 @@ if (args[0] === 'test-slc') {
         console.log("version: " + version.result.Version);
         console.log(" chainHead.result.Cids: " + JSON.stringify(chainHead.result.Cids));
 
-        let blocks = [...Array(chainHead.result.Height).keys()];
+        const { '/': minerCode } = (await StateGetActor('t01000', chainHead.Height)).result.Code;
+        console.log('minerCode: ' + minerCode);
+
+        //let blocks = [...Array(chainHead.result.Height).keys()];
+        //let blocks = [11740];
+        let blocks = SLCRange(11730, chainHead.result.Height);
 
         var blocksSlice = blocks;
         while (blocksSlice.length) {
-            await Promise.all(blocksSlice.splice(0, 50).map(async (block) => {
+            await Promise.all(blocksSlice.splice(0, 10).map(async (block) => {
                 try {
                     var selectedHeight = block;
                     var tipSet = (await ChainGetTipSetByHeight(selectedHeight, chainHead.result.Cids)).result;
-                    if (tipSet.Blocks) {
-                        for (const block of tipSet.Blocks) {
-                            const level1Cid = block.Messages['/'];
-                            if (level1Cid) {
-                                const level2Cids = (await ChainGetNode(level1Cid)).result.Obj.map(obj => obj['/'])
-                                for (const level2Cid of level2Cids) {
-                                    const messageCids = (await ChainGetNode(level2Cid)).result.Obj[2][2].map(obj => obj['/'])
-                                    for (const messageCid of messageCids) {
-                                        const message = await ChainGetMessage({ '/': messageCid });
-                                        if (message.result.Method === 6) {
-                                            var decode = cbor.decode(Buffer.from(message.result.Params, 'base64'));
-                                            if (decode[7] > 0) {
-                                                result.push({
-                                                    height: tipSet.Height,
-                                                    miner: block.Miner,
-                                                    decode: decode,
-                                                    SectorNumber: decode[1],
-                                                    ReplaceCapacity: decode[6],
-                                                    ReplaceSector: decode[7],
-                                                    messageCid,
-                                                    ...message
-                                                });
-                                            }
-                                        }
-                                    }
+
+                    const { '/': blockCid } = tipSet.Cids[0];
+
+                    let messages = (await ChainGetParentMessages(blockCid)).result;
+                    let receipts = (await ChainGetParentReceipts(blockCid)).result; 
+
+                    if (!messages) {
+                        messages = [];
+                      }
+                
+                    messages = messages.map((msg, r) => ({...msg.Message, cid: msg.Cid, receipt: receipts[r]}))
+
+                    for (const msg of messages) {
+                        const { '/': cid } = msg.cid;
+                        if (msg.Method === 6) {
+                            var decode = cbor.decode(Buffer.from(msg.Params, 'base64'));
+                            if (decode[6] == true) {
+                                const { '/': currentMinerCode } = (await StateGetActor(msg.To, chainHead.Height)).result.Code;
+                                if (currentMinerCode == minerCode && msg.receipt.ExitCode == 0) {
+                                    console.log('Height: ' + selectedHeight + ' cid: ' + cid + ' miner: ' + msg.To + ' Params: ' + decode);
+                                    result.push({
+                                        height: tipSet.Height,
+                                        miner: msg.To,
+                                        decode: decode,
+                                        SectorNumber: decode[1],
+                                        ReplaceCapacity: decode[6],
+                                        ReplaceSectorNumber: decode[9],
+                                        cid: cid,
+                                    });
                                 }
                             }
                         }
@@ -278,9 +319,13 @@ if (args[0] === 'test-retrive') {
 
         console.log('wallet: ' + wallet);
 
-        const dataCid = 'bafk2bzacecpmbkxwrhz6umt6rai47mh4wv6zod4cyb5tb6iyqmjy2q4pw4r3u';
+        //t01399,bafk2bzaceaisfbrub4cblcycc26m7lcwu7wsvvq7cxf7sdrj4jegqwntnm7ri
+        //t02486,bafk2bzaceahxe5uhvfzbahupe56usqrqc3223weh44od5oc7a63kx3ipppbvs
 
-        const queryOffer = await ClientMinerQueryOffer('t01857', dataCid);
+
+        const dataCid = 'bafk2bzaceahxe5uhvfzbahupe56usqrqc3223weh44od5oc7a63kx3ipppbvs';
+
+        const queryOffer = await ClientMinerQueryOffer('t02486', dataCid);
 
         console.log(JSON.stringify(queryOffer));
 
@@ -306,7 +351,7 @@ if (args[0] === 'test-retrive') {
               }
 
             ClientRetrieve(retrievalOffer,
-                '/root/out_r1.data').then(data => {
+                '/root/out_r124.data').then(data => {
                 console.log(JSON.stringify(data));
             }).catch(error => {
                 console.log(error);
@@ -479,4 +524,7 @@ module.exports = {
     ChainGetMessage,
     WalletBalance,
     ClientDealSize,
+    StateGetActor,
+    ChainGetParentMessages,
+    ChainGetParentReceipts,
 };

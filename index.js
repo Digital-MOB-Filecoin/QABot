@@ -848,8 +848,8 @@ function SLCRange(start, end) {
 
 async function RunSLCCheck() {
   var cbor = require('cbor');
-  const result = [];
   var chainHead;
+  var found = 0;
 
   try {
     chainHead = await lotus.ChainHead();
@@ -874,8 +874,10 @@ async function RunSLCCheck() {
 
   INFO("RunSLCCheck: chainHead " + chainHead.result.Height);
 
-  let blocks = SLCRange(slcHeight, chainHead.result.Height); // [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-  //let blocks = [...Array(chainHead.result.Height).keys()];
+  const { '/': minerCode } = (await lotus.StateGetActor('t01000', chainHead.Height)).result.Code;
+  INFO("RunSLCCheck: minerCode: " + minerCode);
+
+  let blocks = SLCRange(slcHeight, chainHead.result.Height);
 
   var blocksSlice = blocks;
   while (blocksSlice.length) {
@@ -883,32 +885,28 @@ async function RunSLCCheck() {
       try {
         var selectedHeight = block;
         var tipSet = (await lotus.ChainGetTipSetByHeight(selectedHeight, chainHead.result.Cids)).result;
-        if (tipSet.Blocks) {
-          for (const block of tipSet.Blocks) {
-            const level1Cid = block.Messages['/'];
-            if (level1Cid) {
-              const level2Cids = (await lotus.ChainGetNode(level1Cid)).result.Obj.map(obj => obj['/'])
-              for (const level2Cid of level2Cids) {
-                const messageCids = (await lotus.ChainGetNode(level2Cid)).result.Obj[2][2].map(obj => obj['/'])
-                for (const messageCid of messageCids) {
-                  const message = await lotus.ChainGetMessage({ '/': messageCid });
-                  if (message.result.Method === 6) {
-                    var decode = cbor.decode(Buffer.from(message.result.Params, 'base64'));
-                    if (decode[7] > 0) {
-                      backend.SaveSLC(block.Miner, true, message.result.Params);
-                      result.push({
-                        height: tipSet.Height,
-                        miner: block.Miner,
-                        decode: decode,
-                        SectorNumber: decode[1],
-                        ReplaceCapacity: decode[6],
-                        ReplaceSector: decode[7],
-                        messageCid,
-                        ...message
-                      });
-                    }
-                  }
-                }
+
+        const { '/': blockCid } = tipSet.Cids[0];
+
+        let messages = (await lotus.ChainGetParentMessages(blockCid)).result;
+        let receipts = (await lotus.ChainGetParentReceipts(blockCid)).result; 
+
+        if (!messages) {
+            messages = [];
+          }
+    
+        messages = messages.map((msg, r) => ({...msg.Message, cid: msg.Cid, receipt: receipts[r]}))
+
+        for (const msg of messages) {
+          const { '/': cid } = msg.cid;
+          if (msg.Method === 6) {
+            var decode = cbor.decode(Buffer.from(msg.Params, 'base64'));
+            if (decode[6] == true) {
+              const { '/': currentMinerCode } = (await lotus.StateGetActor(msg.To, chainHead.Height)).result.Code;
+              if (currentMinerCode == minerCode && msg.receipt.ExitCode == 0) {
+                PASSED('SLC', msg.To, JSON.stringify(msg));
+                backend.SaveSLC(msg.To, true, 'Block:' + cid + ';Params:' + msg.Params);
+                found++;
               }
             }
           }
@@ -919,19 +917,14 @@ async function RunSLCCheck() {
 
     }));
 
-    INFO("RunSLCCheck: Remainig blocks: " + blocksSlice.length + " found " + result.length);
+    INFO("RunSLCCheck: Remainig blocks: " + blocksSlice.length + " found " + found);
   }
-
-  result.forEach(element => {
-    INFO(element);
-  });
 
   slcHeight = chainHead.result.Height;
 }
 
 function PrintStorageStats() {
   INFO("*****************STATS*****************");
-  INFO("QABot " + version);
   INFO("StorageDeals: TOTAL : " + (statsStorageDealsPending + statsStorageDealsSuccessful + statsStorageDealsFailed));
   INFO("StorageDeals: PENDING : " + statsStorageDealsPending);
   INFO("StorageDeals: SUCCESSFUL : " + statsStorageDealsSuccessful);
@@ -953,7 +946,6 @@ function PrintStorageStats() {
 
 function PrintRetrievalStats() {
   INFO("*****************STATS*****************");
-  INFO("QABot " + version);
   INFO("RetrieveDeals: TOTAL : " + (statsRetrieveDealsSuccessful + statsRetrieveDealsFailed));
   INFO("RetrieveDeals: SUCCESSFUL : " + statsRetrieveDealsSuccessful);
   INFO("RetrieveDeals: FAILED : " + statsRetrieveDealsFailed);
@@ -1005,6 +997,8 @@ const mainLoopRetrieve = async _ => {
     PrintRetrievalStats();
   }
 };
+
+INFO("QABot " + version);
 
 if (config.bot.mode == 'store') {
   mainLoopStore();
