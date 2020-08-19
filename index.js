@@ -33,12 +33,12 @@ const FILE_SIZE_SMALL = 104857600;   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824;  //(1GB)
 const FILE_SIZE_LARGE = 5368709120;  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 10000;
-const MIN_DAILY_RATE = 5368709120; //5GB
-const MAX_DAILY_RATE = 268435456000; //250GB
+const MIN_DAILY_RATE = 10737418240; //10GB
+const MAX_DAILY_RATE = 134217728000; //125GB
 const HOUR = 3600;
 
 let backend;
-let slcHeight;
+let slcHeight = 1;
 
 const args = require('args')
  
@@ -46,10 +46,7 @@ args
   .option('standalone', 'Run the Bot standalone', false)
   .option('standalone_minerlist', 'Get miner list from lotus', false)
   .option('cmdMode', 'Use lotus commands')
-  .option('size', 'Test file size', FILE_SIZE_EXTRA_SMALL)
   .option('dev', 'Dev env', false)
-  .option('slc', 'Enable/Disable slc', true)
-  .option('slcHeight', 'SLC start height', 1)
  
 const flags = args.parse(process.argv)
 
@@ -64,10 +61,6 @@ if (flags.standalone) {
   backend = BackendClient.Shared(true, backendConfig);
 } else {
   backend = BackendClient.Shared(false, backendConfig);
-}
-
-if (flags.slcHeight) {
-  slcHeight = flags.slcHeight;
 }
 
 const pause = (timeout) => new Promise(res => setTimeout(res, timeout));
@@ -103,29 +96,29 @@ const dealStates = [
 ]
 
 function INFO(msg) {
-  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
 }
 
 function ERROR(msg) {
-  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[31m', '[ ERROR  ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[31m', '[ ERROR  ] ', '\x1b[0m', msg);
 }
 
 function WARNING(msg) {
-  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
 }
 
 function PASSED(type, miner, msg) {
   const util = require('util');
 
   let line = util.format('[%s][%s] %s', type, miner, msg);
-  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[36m', '[ PASSED ] ', '\x1b[0m', line);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[36m', '[ PASSED ] ', '\x1b[0m', line);
 }
 
 function FAILED(type, miner, msg) {
   const util = require('util');
 
   let line = util.format('[%s][%s] %s', type, miner, msg);
-  console.log(timestamp.utc('YYYY/MM/DD:mm:ss:ms'), '\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
 }
 
 function RemoveLineBreaks(data) {
@@ -969,11 +962,8 @@ const mainLoopStore = async _ => {
     await CalculateMinersDailyRate();
     await RunQueryAsks();
     await RunStorageDeals();
-    if (flags.slc) {
-      await RunSLCCheck();
-    }
+    await RunSLCCheck();
     await CheckPendingStorageDeals();
-    await RunRetriveDeals();
 
     const loopDuration = TimeDifferenceInSeconds(startLoop);
     const sleepDuration =  (loopDuration < HOUR) ? (HOUR - loopDuration) : 30;
