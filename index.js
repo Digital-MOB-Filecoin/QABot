@@ -96,29 +96,29 @@ const dealStates = [
 ]
 
 function INFO(msg) {
-  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[32m', '[ INFO ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '[ INFO ]', msg);
 }
 
 function ERROR(msg) {
-  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[31m', '[ ERROR  ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '[ ERROR ]', msg);
 }
 
 function WARNING(msg) {
-  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[33m', '[ WARN ] ', '\x1b[0m', msg);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '[ WARN ]', msg);
 }
 
 function PASSED(type, miner, msg) {
   const util = require('util');
 
   let line = util.format('[%s][%s] %s', type, miner, msg);
-  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[36m', '[ PASSED ] ', '\x1b[0m', line);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '[ PASSED ]', line);
 }
 
 function FAILED(type, miner, msg) {
   const util = require('util');
 
   let line = util.format('[%s][%s] %s', type, miner, msg);
-  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '\x1b[31m', '[ FAILED ] ', '\x1b[0m', line);
+  console.log(timestamp.utc('YYYY/MM/DD-HH:mm:ss:ms'), '[ FAILED ]', line);
 }
 
 function RemoveLineBreaks(data) {
@@ -572,7 +572,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
           'n/a', 
           `PriceLimitCheck failed miner retrieval MinPrice [${o.MinPrice}] maximum retrieval MinPrice [10000000000000]`,
           Math.floor(Date.now()/1000));
-          
+
         statsStorageDealsFailed++;
         prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
         return;
