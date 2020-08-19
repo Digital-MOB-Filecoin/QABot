@@ -72,7 +72,7 @@ class BackendClient {
         return response;
     }
 
-    async SaveDeal(miner_id, type, success, dataCid, dealCid, fileSize, hash, message) {
+    async SaveDeal(miner_id, type, success, dataCid, dealCid, fileSize, hash, message, deal_created_at) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
@@ -91,6 +91,7 @@ class BackendClient {
             message: trimmedMessage,
             data_cid: dataCid,
             deal_cid: dealCid,
+            deal_created_at: deal_created_at,
             file_size: parseInt(fileSize),
             hash: hash
         };
@@ -132,18 +133,18 @@ class BackendClient {
         return response;
     }
 
-    async SaveStoreDeal(miner_id, success, dataCid, dealCid, fileSize, hash, message) {
+    async SaveStoreDeal(miner_id, success, dataCid, dealCid, fileSize, hash, message, deal_created_at) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        return this.SaveDeal(miner_id, 'store', success, dataCid, dealCid, fileSize, hash, message);
+        return this.SaveDeal(miner_id, 'store', success, dataCid, dealCid, fileSize, hash, message, deal_created_at);
     }
 
-    async SaveRetrieveDeal(miner_id, success, dataCid, dealCid, fileSize, hash, message) {
+    async SaveRetrieveDeal(miner_id, success, dataCid, dealCid, fileSize, hash, message, deal_created_at) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        return await this.SaveDeal(miner_id, 'retrieve', success, dataCid, dealCid, fileSize, hash, message);
+        return await this.SaveDeal(miner_id, 'retrieve', success, dataCid, dealCid, fileSize, hash, message, deal_created_at);
     }
 }
 
@@ -159,20 +160,19 @@ if (args[0] === 'test') {
         console.log(error);
     });*/
 
-    /*backend.SaveStoreDeal('t05992', true, 'bafk2bzacectugewoaqpxcvl3ka5mpsq6wjqunfq3cyfjupsk7dpp5kiqut242', 'n/a', 0, '86f61cd1e84e491b4aec695f0274fd653b7363b4caccd7d5dc690e98001efc0e', 'test').then(response => {
+    backend.SaveStoreDeal('t03292', true, 'test', 'n/a', 0, 'test', 'test', Math.floor(Date.now()/1000)).then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
-    });*/
+    });
 
-    //t024771, false, bafk2bzaceaffzp4gorocsyfl2bydfqrielhqgynltq2oxxbbqigzpxaaztn4g, n/a, 100, 05722e7bdfd3ad606b2c7648b74120ffe0beb44d170e2dc07afbb130717e7d6c, Filecoin.ClientRetrieve timeout 60 Seconds
-    /*backend.SaveRetrieveDeal('t024771', false, 'bafk2bzaceaffzp4gorocsyfl2bydfqrielhqgynltq2oxxbbqigzpxaaztn4g', 'n/a', 100, '05722e7bdfd3ad606b2c7648b74120ffe0beb44d170e2dc07afbb130717e7d6c', 'Filecoin.ClientRetrieve timeout 60 Seconds').then(response => {
+    backend.SaveRetrieveDeal('t03292', true, 'test', 'n/a', 100, 'test', 'test', Math.floor(Date.now()/1000)).then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
-    });*/
+    });
 
 
     backend.GetCids(0).then(response => {
@@ -191,8 +191,6 @@ if (args[0] === 'test') {
     }).catch(error => {
         console.log(error);
     });
-
-
 
     /*backend.SaveSLC('t01004', false, 'test').then(response => {
         console.log(response.data);
