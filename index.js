@@ -370,6 +370,18 @@ async function CheckBalance() {
   return true;
 }
 
+function PriceLimitCheck(value, maximumValue) {
+  const BigNumber = require('bignumber.js');
+  let maximumPrice = new BigNumber(maximumValue);
+  let price = new BigNumber(value);
+
+  if (price.comparedTo(maximumPrice) != -1) {
+    return false;
+  }
+
+  return true;
+}
+
 async function StorageDeal(minerData, cmdMode = false) {
   try {
     let miner = minerData.address;
@@ -417,8 +429,16 @@ async function StorageDeal(minerData, cmdMode = false) {
 
     let dealCid;
 
-    INFO(`Miner[${miner}] ask price: ${minerData.price}  epochPrice: ${CalculateStorageDealPrice(minerData.price, pieceSize)}`);
+    //check maximum ask pricce minerData.price < 1_000_000_000_000
+    if (!PriceLimitCheck(minerData.price, '1000000000000')) {
+      FAILED('StoreDeal', miner.address, `PriceLimitCheck failed miner ask price [${minerData.price}] maximum ask price[1000000000000]`);
+      backend.SaveStoreDeal(miner.address, false, 'n/a', 'n/a', 0, 'n/a', `PriceLimitCheck failed miner ask price [${minerData.price}] maximum ask price[1000000000000]`);
+      statsStorageDealsFailed++;
+      prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+      return;
+    }
 
+    INFO(`Miner[${miner}] ask price: ${minerData.price}  epochPrice: ${CalculateStorageDealPrice(minerData.price, pieceSize)}`);
     INFO("Run ClientStartDeal: " + dataCid + " " + miner + " " + CalculateStorageDealPrice(minerData.price, pieceSize) + " 700000");
 
     if (cmdMode) {
@@ -504,6 +524,25 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
         pendingRetriveDealsMap.delete(dataCid);
         await backend.DeleteCid(dataCid);
       } else {
+
+      //UnsealPrice < 1_000_000_000
+      if (!PriceLimitCheck(o.UnsealPrice, '1000000000')) {
+        FAILED('StoreDeal', miner.address, `PriceLimitCheck failed miner UnsealPrice [${o.UnsealPrice}] maximum UnsealPrice [1000000000]`);
+        backend.SaveStoreDeal(miner.address, false, 'n/a', 'n/a', 0, 'n/a', `PriceLimitCheck failed miner UnsealPrice [${o.UnsealPrice}] maximum UnsealPrice [1000000000]`);
+        statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        return;
+      }
+
+      //MinPrice < 10_000_000_000_000
+      if (!PriceLimitCheck(o.MinPrice, '10000000000000')) {
+        FAILED('StoreDeal', miner.address, `PriceLimitCheck failed miner retrieval MinPrice [${o.MinPrice}] maximum retrieval MinPrice [10000000000000]`);
+        backend.SaveStoreDeal(miner.address, false, 'n/a', 'n/a', 0, 'n/a', `PriceLimitCheck failed miner retrieval MinPrice [${o.MinPrice}] maximum retrieval MinPrice [10000000000000]`);
+        statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        return;
+      }
+
       const retrievalOffer = {
         Root: o.Root,
         Piece: null,
