@@ -1,4 +1,6 @@
 'use strict';
+const bot_config = require('./config');
+const bot_region = bot_config.bot.region;
 
 class BackendClient {
     constructor(dummyMode, config) {
@@ -93,7 +95,8 @@ class BackendClient {
             deal_cid: dealCid,
             deal_created_at: deal_created_at,
             file_size: parseInt(fileSize),
-            hash: hash
+            hash: hash,
+            bot_region: bot_region
         };
 
         let response;
@@ -160,14 +163,14 @@ if (args[0] === 'test') {
         console.log(error);
     });*/
 
-    backend.SaveStoreDeal('t03292', true, 'test', 'n/a', 0, 'test', 'test', Math.floor(Date.now()/1000)).then(response => {
+    backend.SaveStoreDeal('t01973', true, 'test1231', 'n/a', 0, 'test12331', 'test12341', Math.floor(Date.now()/1000)).then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
     });
 
-    backend.SaveRetrieveDeal('t03292', true, 'test', 'n/a', 100, 'test', 'test', Math.floor(Date.now()/1000)).then(response => {
+    backend.SaveRetrieveDeal('t01973', true, 'test121', 'n/a', 100, 'test121', 'test121', Math.floor(Date.now()/1000)).then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {

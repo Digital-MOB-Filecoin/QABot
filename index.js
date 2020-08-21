@@ -32,9 +32,9 @@ const FILE_SIZE_EXTRA_SMALL = 100;
 const FILE_SIZE_SMALL = 104857600;   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824;  //(1GB)
 const FILE_SIZE_LARGE = 5368709120;  // (5GB)
-const MAX_PENDING_STORAGE_DEALS = 10000;
-const MIN_DAILY_RATE = 10737418240; //10GB
-const MAX_DAILY_RATE = 134217728000; //125GB
+const MAX_PENDING_STORAGE_DEALS = 100000;
+const MIN_DAILY_RATE = config.bot.min_daily_rate * 1073741824;
+const MAX_DAILY_RATE = config.bot.max_daily_rate * 1073741824;
 const HOUR = 3600;
 
 let backend;
@@ -675,6 +675,172 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
   }
 }
 
+async function RetrieveDealSync(dataCid, retrieveDeal, cmdMode = false) {
+  INFO("RetrieveDeal [" + dataCid + "]");
+
+  pendingRetriveDealsMap.set(dataCid, {
+    miner: retrieveDeal.miner,
+    timestamp: Date.now()
+  });
+
+  try {
+    let outFile = RandomTestFilePath(config.bot.retrieve);
+    const walletDefault = await lotus.WalletDefaultAddress();
+    const wallet = walletDefault.result;
+    const queryOffer = await lotus.ClientMinerQueryOffer(retrieveDeal.miner, dataCid);
+
+    INFO(`ClientMinerQueryOffer [${retrieveDeal.miner},${dataCid}] ${JSON.stringify(queryOffer)}`);
+
+    const o = queryOffer.result;
+
+    if (queryOffer.result.Err) {
+      ERROR(`ClientMinerQueryOffer [${retrieveDeal.miner},${dataCid}] ${JSON.stringify(queryOffer)}`);
+      //FAILED -> send result to BE
+      FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer));
+      backend.SaveRetrieveDeal(
+        retrieveDeal.miner,
+        false,
+        dataCid,
+        'n/a',
+        parseInt(retrieveDeal.size),
+        retrieveDeal.fileHash,
+        'ClientMinerQueryOffer Err:' + JSON.stringify(queryOffer),
+        Math.floor(Date.now() / 1000));
+
+      pendingRetriveDealsMap.delete(dataCid);
+      await backend.DeleteCid(dataCid);
+    } else {
+
+      //UnsealPrice < 1_000_000_000
+      if (!PriceLimitCheck(o.UnsealPrice, '1000000000')) {
+        FAILED('StoreDeal', retrieveDeal.miner, `PriceLimitCheck failed miner UnsealPrice [${o.UnsealPrice}] maximum UnsealPrice [1000000000]`);
+        backend.SaveRetrieveDeal(
+          retrieveDeal.miner,
+          false,
+          'n/a',
+          'n/a',
+          0,
+          'n/a',
+          `PriceLimitCheck failed miner UnsealPrice [${o.UnsealPrice}] maximum UnsealPrice [1000000000]`,
+          Math.floor(Date.now() / 1000));
+
+        statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        return;
+      }
+
+      //MinPrice < 10_000_000_000_000
+      if (!PriceLimitCheck(o.MinPrice, '10000000000000')) {
+        FAILED('StoreDeal', retrieveDeal.miner, `PriceLimitCheck failed miner retrieval MinPrice [${o.MinPrice}] maximum retrieval MinPrice [10000000000000]`);
+        backend.SaveRetrieveDeal(
+          retrieveDeal.miner,
+          false,
+          'n/a',
+          'n/a',
+          0,
+          'n/a',
+          `PriceLimitCheck failed miner retrieval MinPrice [${o.MinPrice}] maximum retrieval MinPrice [10000000000000]`,
+          Math.floor(Date.now() / 1000));
+
+        statsStorageDealsFailed++;
+        prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+        return;
+      }
+
+      const retrievalOffer = {
+        Root: o.Root,
+        Piece: null,
+        Size: o.Size,
+        Total: o.MinPrice,
+        UnsealPrice: o.UnsealPrice,
+        PaymentInterval: o.PaymentInterval,
+        PaymentIntervalIncrease: o.PaymentIntervalIncrease,
+        Client: wallet,
+        Miner: o.Miner,
+        MinerPeer: o.MinerPeer
+      }
+
+      const timeoutInSeconds = 1 * 3600; // 1 hours lotus.ClientRetrieve timeout
+
+      const timeoutPromise = Timeout(timeoutInSeconds);
+      const retrievalTimestamp = Date.now();
+
+      const data = await Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]);
+      INFO(JSON.stringify(data));
+
+      pendingRetriveDealsMap.delete(dataCid);
+      await backend.DeleteCid(dataCid);
+
+      if (data === 'timeout') {
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
+        backend.SaveRetrieveDeal(
+          retrieveDeal.miner,
+          false,
+          dataCid,
+          'n/a',
+          retrieveDeal.size,
+          retrieveDeal.fileHash,
+          `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`,
+          Math.floor(retrievalTimestamp / 1000));
+
+        statsRetrieveDealsFailed++;
+        prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
+      } else if (data.error) {
+        FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';' + JSON.stringify(data.error));
+        backend.SaveRetrieveDeal(
+          retrieveDeal.miner,
+          false,
+          dataCid,
+          'n/a',
+          retrieveDeal.size,
+          retrieveDeal.fileHash,
+          JSON.stringify(data.error) + ' ClientMinerQueryOffer: ' + JSON.stringify(queryOffer),
+          Math.floor(retrievalTimestamp / 1000));
+
+        statsRetrieveDealsFailed++;
+        prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
+      } else {
+        var hash = SHA256FileSync(outFile);
+        INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
+        if (hash == retrieveDeal.fileHash) {
+          //PASSED -> send result to BE
+          PASSED('RetrieveDeal', retrieveDeal.miner, dataCid + ';success outFile:' + outFile + 'sha256:' + hash);
+          backend.SaveRetrieveDeal(
+            retrieveDeal.miner,
+            true,
+            dataCid,
+            'n/a',
+            retrieveDeal.size,
+            retrieveDeal.fileHash,
+            'success',
+            Math.floor(retrievalTimestamp / 1000));
+
+          statsRetrieveDealsSuccessful++;
+          prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
+        } else {
+          //FAILED -> send result to BE
+          FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
+          backend.SaveRetrieveDeal(
+            retrieveDeal.miner,
+            false,
+            dataCid,
+            'n/a',
+            retrieveDeal.size,
+            retrieveDeal.fileHash,
+            'hash check failed sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash,
+            Math.floor(retrievalTimestamp / 1000));
+
+          statsRetrieveDealsFailed++;
+          prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
+        }
+      }
+    }
+  } catch (e) {
+    pendingRetriveDealsMap.delete(dataCid);
+    ERROR('Error: ' + e.message);
+  }
+}
+
 function SHA256File(path) {
   return new Promise((resolve, reject) => {
     const output = crypto.createHash('sha256')
@@ -854,11 +1020,15 @@ async function RunStorageDeals() {
   }
 }
 
-async function RunRetriveDeals() {
+async function RunRetriveDeals(serialRetrieve = false) {
   var it = 0;
   while (!stop && (it < cidsList.length)) {
     if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
-      await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+      if (serialRetrieve) {
+        await RetrieveDealSync(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+      } else {
+        await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+      }
     }
     await pause(1000);
     it++;
@@ -1075,6 +1245,11 @@ function PrintRetrievalStats() {
 }
 
 const mainLoopStore = async _ => {
+  INFO(`Region: ${config.bot.region} startup_delay: ${config.bot.startup_delay} hours, proposal window: ${config.bot.proposal_window} seconds`);
+  INFO(`MIN_DAILY_RATE = ${MIN_DAILY_RATE}, MAX_DAILY_RATE = ${MAX_DAILY_RATE}`);
+
+  await pause(config.bot.startup_delay * HOUR * 1000);
+
   if (flags.standalone_minerlist) {
     await LoadMiners();
   }
@@ -1095,7 +1270,7 @@ const mainLoopStore = async _ => {
     await CheckPendingStorageDeals();
 
     const loopDuration = TimeDifferenceInSeconds(startLoop);
-    const sleepDuration =  (loopDuration < HOUR) ? (HOUR - loopDuration) : 30;
+    const sleepDuration =  (loopDuration < config.bot.proposal_window) ? (config.bot.proposal_window - loopDuration) : 30;
 
     INFO(`loopDuration: ${loopDuration} Seconds sleepDuration: ${sleepDuration} Seconds`);
 
@@ -1111,13 +1286,14 @@ const mainLoopRetrieve = async _ => {
       continue;
     }
     await LoadRetrievalList();
-    await RunRetriveDeals();
+    await RunRetriveDeals((config.bot.mode == 'serial-retrieve'));
     await pause(120 * 1000); // 2 min
     PrintRetrievalStats();
   }
 };
 
 INFO("QABot " + version);
+INFO(`QABot mode = ${config.bot.mode}`);
 
 if (config.bot.mode == 'store') {
   mainLoopStore();

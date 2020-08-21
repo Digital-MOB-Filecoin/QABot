@@ -4,9 +4,14 @@ module.exports = {
   bot: {
     import: process.env.BOT_IMPORT_PATH || '/root/import/',
     retrieve: process.env.BOT_RETRIEVE_PATH || '/root/retrieve/',
-    mode: process.env.BOT_MODE || 'retrieve', // or retrieve
+    mode: process.env.BOT_MODE || 'retrieve', // or store or serial-retrieve
     index: process.env.BOT_INDEX || 0, // current bot index
     total: process.env.BOT_TOTAL || 1, // total number of bots
+    min_daily_rate: process.env.MIN_DAILY_RATE || 10, //GB
+    max_daily_rate: process.env.MAX_DAILY_RATE || 125, //GB
+    startup_delay: process.env.STARTUP_DELAY || 0, //hours
+    proposal_window: process.env.PROPOSAL_WINDOW || 3600, //seconds
+    region: process.env.REGION || 'US-EAST', //bot region
   },
   backend_dev: {
     api: process.env.BACKEND_API || 'https://competition-backend.dev.interplanetary.one/api/',
