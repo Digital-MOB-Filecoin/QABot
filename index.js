@@ -33,6 +33,7 @@ const FILE_SIZE_SMALL = 104857600;   //(100MB)
 const FILE_SIZE_MEDIUM = 1073741824;  //(1GB)
 const FILE_SIZE_LARGE = 5368709120;  // (5GB)
 const MAX_PENDING_STORAGE_DEALS = 100000;
+const MAX_PENDING_RETRIEVAL_DEALS = config.bot.max_pending_retrieval_deals;
 const MIN_DAILY_RATE = config.bot.min_daily_rate * 1073741824;
 const MAX_DAILY_RATE = config.bot.max_daily_rate * 1073741824;
 const HOUR = 3600;
@@ -555,8 +556,12 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
           `PriceLimitCheck failed miner UnsealPrice [${o.UnsealPrice}] maximum UnsealPrice [1000000000]`,
           Math.floor(Date.now()/1000));
 
+        pendingRetriveDealsMap.delete(dataCid);
+        await backend.DeleteCid(dataCid);
+
         statsStorageDealsFailed++;
         prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+
         return;
       }
 
@@ -573,8 +578,12 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
           `PriceLimitCheck failed miner retrieval MinPrice [${o.MinPrice}] maximum retrieval MinPrice [10000000000000]`,
           Math.floor(Date.now()/1000));
 
+        pendingRetriveDealsMap.delete(dataCid);
+        await backend.DeleteCid(dataCid);
+
         statsStorageDealsFailed++;
         prometheus.SetFailedStorageDeals(statsStorageDealsFailed);
+
         return;
       }
 
@@ -600,9 +609,6 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
       Promise.race([lotus.ClientRetrieve(retrievalOffer, outFile), timeoutPromise]).then(async data => {
         INFO(JSON.stringify(data));
 
-        pendingRetriveDealsMap.delete(dataCid);
-        await backend.DeleteCid(dataCid);
-
         if (data === 'timeout') {
           FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`);
           backend.SaveRetrieveDeal(
@@ -614,6 +620,9 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
             retrieveDeal.fileHash,
             `Filecoin.ClientRetrieve timeout ${timeoutInSeconds} Seconds`,
             Math.floor(retrievalTimestamp / 1000));
+
+          pendingRetriveDealsMap.delete(dataCid);
+          await backend.DeleteCid(dataCid);
 
           statsRetrieveDealsFailed++;
           prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
@@ -628,6 +637,9 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
             retrieveDeal.fileHash,
             JSON.stringify(data.error) + ' ClientMinerQueryOffer: ' + JSON.stringify(queryOffer),
             Math.floor(retrievalTimestamp / 1000));
+
+          pendingRetriveDealsMap.delete(dataCid);
+          await backend.DeleteCid(dataCid)
 
           statsRetrieveDealsFailed++;
           prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
@@ -647,6 +659,9 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
               'success',
               Math.floor(retrievalTimestamp / 1000));
 
+            pendingRetriveDealsMap.delete(dataCid);
+            await backend.DeleteCid(dataCid)
+
             statsRetrieveDealsSuccessful++;
             prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
           } else {
@@ -661,6 +676,9 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
               retrieveDeal.fileHash,
               'hash check failed sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash,
               Math.floor(retrievalTimestamp / 1000));
+
+            pendingRetriveDealsMap.delete(dataCid);
+            await backend.DeleteCid(dataCid)
 
             statsRetrieveDealsFailed++;
             prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
@@ -1023,6 +1041,10 @@ async function RunStorageDeals() {
 async function RunRetriveDeals(serialRetrieve = false) {
   var it = 0;
   while (!stop && (it < cidsList.length)) {
+    if (pendingRetriveDealsMap.size >= MAX_PENDING_RETRIEVAL_DEALS) {
+      INFO(`RunRetriveDeals pending retrieval deals limit reached MAX_PENDING_RETRIEVAL_DEALS(${MAX_PENDING_RETRIEVAL_DEALS})`);
+      break;
+    }
     if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
       if (serialRetrieve) {
         await RetrieveDealSync(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
@@ -1281,6 +1303,8 @@ const mainLoopStore = async _ => {
 
 const mainLoopRetrieve = async _ => {
   while (!stop) {
+    INFO(`CURRENT_PENDING_RETRIEVAL_DEALS = ${pendingRetriveDealsMap.size} , MAX_PENDING_RETRIEVAL_DEALS = ${MAX_PENDING_RETRIEVAL_DEALS}`);
+
     if (!await CheckBalance()) {
       await pause(30 * 1000);
       continue;

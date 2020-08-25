@@ -12,6 +12,7 @@ module.exports = {
     startup_delay: process.env.STARTUP_DELAY || 0, //hours
     proposal_window: process.env.PROPOSAL_WINDOW || 3600, //seconds
     region: process.env.REGION || 'US-EAST', //bot region
+    max_pending_retrieval_deals: process.env.MAX_PENDING_RETRIEVAL_DEALS || 200, 
   },
   backend_dev: {
     api: process.env.BACKEND_API || 'https://competition-backend.dev.interplanetary.one/api/',
