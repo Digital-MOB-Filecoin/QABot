@@ -24,7 +24,7 @@ module.exports = {
   },
   lotus: {
     api: process.env.LOTUS_API || 'http://64.227.17.40:1234/rpc/v0',
-    token: process.env.LOTUS_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.qjzwrdDtfrTGqBP0vYMdmQhV29_X--yHHtb6wXmDuf0',
+    token: process.env.LOTUS_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.5MQ6VTgdHhKwS4UH9lMwDx17BeqW-iofBWZ4KoAN0dc',
   },
   prometheus: {
     api: process.env.PUSHGATEWAY_API || 'http://127.0.0.1:9091',

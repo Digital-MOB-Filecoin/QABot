@@ -1237,6 +1237,18 @@ async function RunSLCCheck() {
   slcHeight = chainHead.result.Height;
 }
 
+async function CheckLotus() {
+  let checkResult = true;
+  try {
+    const version = await lotus.Version();
+  } catch (e) {
+    ERROR(`CheckLotus: ${e}`);
+    checkResult = false;
+  }
+
+  return checkResult;
+}
+
 function PrintStorageStats() {
   INFO("*****************STATS*****************");
   INFO("StorageDeals: TOTAL : " + (statsStorageDealsPending + statsStorageDealsSuccessful + statsStorageDealsFailed));
@@ -1302,8 +1314,16 @@ const mainLoopStore = async _ => {
 };
 
 const mainLoopRetrieve = async _ => {
+  //startup sleep
+  await pause(300 * 1000); // 5 min
+
   while (!stop) {
     INFO(`CURRENT_PENDING_RETRIEVAL_DEALS = ${pendingRetriveDealsMap.size} , MAX_PENDING_RETRIEVAL_DEALS = ${MAX_PENDING_RETRIEVAL_DEALS}`);
+
+    if(!await CheckLotus()) {
+      shutdown(1);
+      break;
+    }
 
     if (!await CheckBalance()) {
       await pause(30 * 1000);
@@ -1325,12 +1345,12 @@ if (config.bot.mode == 'store') {
   mainLoopRetrieve();
 }
 
-function shutdown() {
+function shutdown(exitCode = 0) {
   stop = true;
 
   setTimeout(() => { 
     INFO(`Shutdown`);
-    process.exit(); 
+    process.exit(exitCode); 
   }, 3000);
 }
 // listen for TERM signal .e.g. kill
