@@ -136,7 +136,7 @@ function getRandomInt(max) {
 }
 
 function RandomTestFileSize() {
-  const sizes = [FILE_SIZE_EXTRA_SMALL, FILE_SIZE_SMALL, FILE_SIZE_MEDIUM];
+  const sizes = [FILE_SIZE_EXTRA_SMALL, FILE_SIZE_SMALL];
   return sizes[getRandomInt(sizes.length)];
 }
 
