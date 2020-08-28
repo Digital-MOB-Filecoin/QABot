@@ -1157,6 +1157,7 @@ async function StorageDealStatus(dealCid, pendingStorageDeal) {
       }
 
       await backend.UpdateStoreDeal(updateStoreDeal);
+      INFO (`UpdateStoreDeal[${pendingStorageDeal.miner}] dealCid: ${dealCid} ${JSON.stringify(updateStoreDeal)}`);
 
     } else {
       WARNING("ClientGetDealInfo: " + JSON.stringify(data));
