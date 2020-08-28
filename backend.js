@@ -74,11 +74,11 @@ class BackendClient {
         return response;
     }
 
-    async SaveDeal(miner_id, type, success, dataCid, dealCid, fileSize, hash, message, deal_created_at) {
+    async SaveDeal(miner_id, type, success, deal_state, dataCid, dealCid, fileSize, hash, message, deal_created_at) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        const MAX_LENGTH = 500;
+        const MAX_LENGTH = 1000;
         var trimmedMessage = message.length > MAX_LENGTH ?
             message.substring(0, MAX_LENGTH - 3) + "..." :
             message;
@@ -90,6 +90,7 @@ class BackendClient {
             miner_id: miner_id,
             type: type,
             success: success,
+            deal_state: deal_state,
             message: trimmedMessage,
             data_cid: dataCid,
             deal_cid: dealCid,
@@ -106,7 +107,36 @@ class BackendClient {
             console.error('Respose: ' + JSON.stringify(e.response.data));
         }
 
-        return response;
+        return response.data;
+    }
+
+    async UpdateDeal(id, success, deal_state, hash, message) {
+        if (this.dummyMode)
+            return Promise.resolve('dummy');
+
+        const MAX_LENGTH = 1000;
+        var trimmedMessage = message.length > MAX_LENGTH ?
+            message.substring(0, MAX_LENGTH - 3) + "..." :
+            message;
+
+        const axios = require('axios');
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${this.token}` }
+
+        const data = {
+            success: success,
+            deal_state: deal_state,
+            message: trimmedMessage,
+            hash: hash,
+        };
+
+        let response;
+        try {
+            response = await axios.put(this.api + 'miner/deal/' + id, data);
+        } catch (e) {
+            console.error('Respose: ' + JSON.stringify(e.response.data));
+        }
+
+        return response.data;
     }
 
     async SaveSLC(miner_id, success, message) {
@@ -136,18 +166,40 @@ class BackendClient {
         return response;
     }
 
-    async SaveStoreDeal(miner_id, success, dataCid, dealCid, fileSize, hash, message, deal_created_at) {
+    async SaveStoreDeal(saveStoreDeal) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        return this.SaveDeal(miner_id, 'store', success, dataCid, dealCid, fileSize, hash, message, deal_created_at);
+        return this.SaveDeal(
+            saveStoreDeal.miner_id, 
+            'store', 
+            saveStoreDeal.success, 
+            saveStoreDeal.deal_state, 
+            saveStoreDeal.dataCid, 
+            saveStoreDeal.dealCid, 
+            saveStoreDeal.fileSize, 
+            saveStoreDeal.hash, 
+            saveStoreDeal.message, 
+            saveStoreDeal.deal_created_at);
+    }
+
+    async UpdateStoreDeal(updateStoreDeal) {
+        if (this.dummyMode)
+            return Promise.resolve('dummy');
+
+        return this.UpdateDeal(
+            updateStoreDeal.id, 
+            updateStoreDeal.success, 
+            updateStoreDeal.deal_state, 
+            updateStoreDeal.hash, 
+            updateStoreDeal.message);
     }
 
     async SaveRetrieveDeal(miner_id, success, dataCid, dealCid, fileSize, hash, message, deal_created_at) {
         if (this.dummyMode)
             return Promise.resolve('dummy');
 
-        return await this.SaveDeal(miner_id, 'retrieve', success, dataCid, dealCid, fileSize, hash, message, deal_created_at);
+        return await this.SaveDeal(miner_id, 'retrieve', success, 'n/a', dataCid, dealCid, fileSize, hash, message, deal_created_at);
     }
 }
 
@@ -163,22 +215,45 @@ if (args[0] === 'test') {
         console.log(error);
     });*/
 
-    backend.SaveStoreDeal('t01973', true, 'test1231', 'n/a', 0, 'test12331', 'test12341', Math.floor(Date.now()/1000)).then(response => {
+    (async () => {
+        const saveStoreDeal = {
+            miner_id: 't01973', 
+            success: null, 
+            deal_state: 'deal_state1', 
+            dataCid: 'datacid_pendingdeals8', 
+            dealCid: 'dealcid', 
+            fileSize: 0, 
+            hash: 'hash1', 
+            message: 'message1', 
+            deal_created_at: Math.floor(Date.now()/1000),
+        };
+
+        const {id} = await backend.SaveStoreDeal(saveStoreDeal);
+
+        const updateStoreDeal = {
+            id: id, 
+            success: true, 
+            deal_state: 'deal_state', 
+            hash: 'hash', 
+            message: 'message',
+        };
+
+
+        const updateResponse = await backend.UpdateStoreDeal(updateStoreDeal);
+
+        console.log(`SaveStoreDeal id: ${id}`);
+        console.log(`UpdateStoreDeal response: ${JSON.stringify(updateResponse)}`);
+    })();
+
+    /*backend.SaveRetrieveDeal('t01973', true, 'test121', 'n/a', 100, 'test121', 'test121', Math.floor(Date.now()/1000)).then(response => {
         console.log(response.data);
         console.log(response.status);
     }).catch(error => {
         console.log(error);
-    });
-
-    backend.SaveRetrieveDeal('t01973', true, 'test121', 'n/a', 100, 'test121', 'test121', Math.floor(Date.now()/1000)).then(response => {
-        console.log(response.data);
-        console.log(response.status);
-    }).catch(error => {
-        console.log(error);
-    });
+    });*/
 
 
-    backend.GetCids(0).then(response => {
+    /*backend.GetCids(0).then(response => {
         console.log('GetCids: ' + JSON.stringify(response.data));
         console.log(response.status);
 
@@ -193,7 +268,7 @@ if (args[0] === 'test') {
         });
     }).catch(error => {
         console.log(error);
-    });
+    });*/
 
     /*backend.SaveSLC('t01004', false, 'test').then(response => {
         console.log(response.data);
