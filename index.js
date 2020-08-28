@@ -14,6 +14,7 @@ const { version } = require('./package.json');
 var uniqueFilename = require('unique-filename')
 
 let stop = false;
+let maintenance = false;
 let topMinersList = new Array;
 let cidsList = new Array;
 let storageDealsMap = new Map();
@@ -516,7 +517,7 @@ async function StorageDeal(minerData, cmdMode = false) {
 
     if (!storageDealsMap.has(dealCid)) {
       storageDealsMap.set(dealCid, {
-        id: id;
+        id: id,
         dataCid: dataCid,
         importID: importID,
         miner: miner,
@@ -966,8 +967,8 @@ async function RunQueryAsks() {
   let tmpMinersList = new Array;
 
   var minersSlice = topMinersList;
-  while (minersSlice.length) {
-    await Promise.all(minersSlice.splice(0, 10).map(async (miner) => {
+  while (!stop && !maintenance && minersSlice.length) {
+    await Promise.all(minersSlice.splice(0, 20).map(async (miner) => {
       try {
         const minerInfo = await lotus.StateMinerInfo(miner.address);
         INFO(JSON.stringify(minerInfo));
@@ -1043,7 +1044,7 @@ async function RunQueryAsks() {
 
 async function RunStorageDeals() {
   var it = 0;
-  while (!stop && (it < topMinersList.length)) {
+  while (!stop && !maintenance && (it < topMinersList.length)) {
     if (storageDealsMap.size > MAX_PENDING_STORAGE_DEALS) {
       INFO("RunStorageDeals pending storage deals = MAX_PENDING_STORAGE_DEALS");
       break;
@@ -1069,7 +1070,7 @@ async function RunStorageDeals() {
 
 async function RunRetriveDeals(serialRetrieve = false) {
   var it = 0;
-  while (!stop && (it < cidsList.length)) {
+  while (!stop && !maintenance && (it < cidsList.length)) {
     if (pendingRetriveDealsMap.size >= MAX_PENDING_RETRIEVAL_DEALS) {
       INFO(`RunRetriveDeals pending retrieval deals limit reached MAX_PENDING_RETRIEVAL_DEALS(${MAX_PENDING_RETRIEVAL_DEALS})`);
       break;
@@ -1365,6 +1366,13 @@ if (config.bot.mode == 'store') {
 } else {
   mainLoopRetrieve();
 }
+
+setTimeout(async () => {
+  maintenance = await backend.Maintenance();
+  if (maintenance) {
+    INFO(`Maintenance mode, current pending deals: ${storageDealsMap.size}`);
+  }
+}, 30000);
 
 function shutdown(exitCode = 0) {
   stop = true;

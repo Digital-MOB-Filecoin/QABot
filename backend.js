@@ -43,6 +43,25 @@ class BackendClient {
         return response;
     }
 
+    async Maintenance() {
+        const axios = require('axios');
+        axios.defaults.headers.common = { 'Authorization': `Bearer ${this.token}` };
+        let result = false;
+
+        let response;
+        try {
+            response = await axios.get(this.api + 'admin/maintenance');
+
+            if (response.data.maintenance === true) {
+                result = true; 
+            }
+        } catch (e) {
+            console.error('Respose: ' + JSON.stringify(e.response.data));
+        }
+
+        return result;
+    }
+
     async GetCids(skip = 0) {
         const axios = require('axios');
         axios.defaults.headers.common = { 'Authorization': `Bearer ${this.token}` }
@@ -216,6 +235,10 @@ if (args[0] === 'test') {
     });*/
 
     (async () => {
+        if (await backend.Maintenance()) {
+            console.log('Maintenance mode');
+        }
+
         const saveStoreDeal = {
             miner_id: 't01973', 
             success: null, 
