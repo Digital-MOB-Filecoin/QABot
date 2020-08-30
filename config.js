@@ -13,6 +13,7 @@ module.exports = {
     proposal_window: process.env.PROPOSAL_WINDOW || 3600, //seconds
     region: process.env.REGION || 'US-EAST', //bot region
     max_pending_retrieval_deals: process.env.MAX_PENDING_RETRIEVAL_DEALS || 200, 
+    deal_epochs: process.env.DEAL_EPOCHS || 5760, //epochs for 48 hours
   },
   backend_dev: {
     api: process.env.BACKEND_API || 'https://competition-backend.dev.interplanetary.one/api/',
