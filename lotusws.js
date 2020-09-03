@@ -142,12 +142,6 @@ var args = process.argv.slice(2);
 
 if (args[0] === 'test-store') {
 
-    api = 'http://64.227.17.40:3999/rpc/v0'; // qabot1
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.mRcReGSPD2xCqi6tZOiUAPo7em9-fUZ3bmU2MDszK2k';
-    
-    //api = 'http://167.99.239.106:3999/rpc/v0'; // qabot3
-    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.P7quRaE9cZkfPSyxoJ4GZ_PeD5BUL1PBqU-Ac9kdYGM'; // qabot3
-
     const lotus = LotusWsClient.Shared();
 
     (async () => {

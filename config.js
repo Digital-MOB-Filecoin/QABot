@@ -16,16 +16,16 @@ module.exports = {
     deal_epochs: process.env.DEAL_EPOCHS || 5760, //epochs for 48 hours
   },
   backend_dev: {
-    api: process.env.BACKEND_API || 'https://competition-backend.dev.interplanetary.one/api/',
-    token: process.env.BACKEND_TOKEN || 'eyJpZCI6Miwic2VydmljZV90b2tlbiI6InNlcnZpY2VfdG9rZW4ifQ==',
+    api: process.env.BACKEND_API || '',
+    token: process.env.BACKEND_TOKEN || '',
   },
   backend: {
-    api: process.env.BACKEND_API || 'https://api.calibration.spacerace.filecoin.io/api/',
-    token: process.env.BACKEND_TOKEN || 'eyJpZCI6Miwic2VydmljZV90b2tlbiI6IkRYMm5KbUJ0SGZTNFN5OXAifQ==',
+    api: process.env.BACKEND_API || '',
+    token: process.env.BACKEND_TOKEN || '',
   },
   lotus: {
-    api: process.env.LOTUS_API || 'http://64.227.17.40:1234/rpc/v0',
-    token: process.env.LOTUS_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.5MQ6VTgdHhKwS4UH9lMwDx17BeqW-iofBWZ4KoAN0dc',
+    api: process.env.LOTUS_API || '',
+    token: process.env.LOTUS_TOKEN || '',
   },
   prometheus: {
     api: process.env.PUSHGATEWAY_API || 'http://127.0.0.1:9091',

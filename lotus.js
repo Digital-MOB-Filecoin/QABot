@@ -157,8 +157,6 @@ function SLCRange(start, end) {
 }
 
 if (args[0] === 'test-balance') {
-    //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.qJO3-Y_GGW0jnbN-xKlaP4KOIAR-buez1yLI_EZrfTw';// qabot2
 
     (async () => {
         const dealSize = await ClientDealSize("bafykbzacec2mek5eduoz6doe46ta34oomyimd2fsolc7daqsbxv6pb75ska4q");
@@ -202,9 +200,6 @@ type SectorPreCommitInfo struct {
 
 if (args[0] === 'test-slc') {
     var cbor = require('cbor');
-
-    //api = 'http://104.248.116.108:1234/rpc/v0'; // qabot2
-    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.b4J6r2hB4FTgHicCUEJZhZzDn9et3Zhqwh8DiNkgxcQ';// qabot2
 
     (async () => {
         const result = [];
@@ -277,8 +272,6 @@ if (args[0] === 'test-slc') {
 }
 
 if (args[0] === 'test-ip') {
-    api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.h5QDbjr-3cTI3Jnc4xczWvUBpK2-jTM65JOQGj2fnvA';// qabot2
 
     StateMinerInfo('t02000').then(data => {
         console.log(data);
@@ -293,8 +286,6 @@ if (args[0] === 'test-ip') {
 }
 
 if (args[0] === 'test-online') {
-    api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.XCVQTyuuh8Qh0_KiQt8f2EuaiYj8UlZ9ns5q29acWAc';// qabot1
 
     (async () => {
         const {result} = await NetConnectedness('12D3KooWDgdHbJeoVbcGKkvFhB49mP5B2cq5vYuRGNnzSQHSpkhs');
@@ -307,11 +298,6 @@ if (args[0] === 'test-online') {
 }
 
 if (args[0] === 'test-retrive') {
-    //api = 'http://178.128.158.180:3999/rpc/v0'; // qabot3
-    //token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.ev6YqAE4OkXaI7RGRpxKjalTdLltLI4T3tjWcBrON_c';// qabot2
-    //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    //api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
-
 
     (async () => {
         const walletDefault = await WalletDefaultAddress();
@@ -361,10 +347,6 @@ if (args[0] === 'test-retrive') {
 }
 
 if (args[0] === 'test-sector') {
-    api = 'http://178.128.158.180:3999/rpc/v0'; // qabot3
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.Y8l11zZ3GcGh3Wtjmt3XQ5jznpOFZKzCu6W57bvzK4o';// qabot2
-    //api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    //api = 'http://64.227.17.40:3999/rpc/v0';  // qabot1
 
     /*StateSectorGetInfo('t01812', 0).then(data => {
             console.log(JSON.stringify(data));
@@ -419,8 +401,6 @@ if (args[0] === 'test-sector') {
 }
 
 if (args[0] === 'test-store') {
-    api = 'http://104.248.116.108:3999/rpc/v0'; // qabot2
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJyZWFkIiwid3JpdGUiLCJzaWduIiwiYWRtaW4iXX0.uxVEWd2TmAX498c4Fak9xmbR9ocXaiYwZuelf4_yluY'; // qabot2
 
     (async () => {
         try {
@@ -473,7 +453,6 @@ if (args[0] === 'test-store') {
 }
 
 if (args[0] === 'test') {
-    api = 'http://178.128.158.180:3999/rpc/v0'; // qabot3
 
     StateMinerPower("t089665").then(data => {
         console.log(data)
