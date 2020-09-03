@@ -14,6 +14,7 @@ module.exports = {
     region: process.env.REGION || 'US-EAST', //bot region
     max_pending_retrieval_deals: process.env.MAX_PENDING_RETRIEVAL_DEALS || 200, 
     deal_epochs: process.env.DEAL_EPOCHS || 5760, //epochs for 48 hours
+    startup_maintenance_delay: process.env.STARTUP_MAINTENANCE_DELAY || 0, //hours
   },
   backend_dev: {
     api: process.env.BACKEND_API || '',

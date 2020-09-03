@@ -1368,12 +1368,17 @@ if (config.bot.mode == 'store') {
   mainLoopRetrieve();
 }
 
-setTimeout(async () => {
-  maintenance = await backend.Maintenance();
-  if (maintenance) {
-    INFO(`Maintenance mode, current pending deals: ${storageDealsMap.size}`);
-  }
-}, 30000);
+setTimeout(() => {
+  INFO(`Start Maintenance mode check, after ${config.bot.startup_maintenance_delay} hours`);
+  setInterval(async () => {
+    maintenance = await backend.Maintenance();
+    if (maintenance) {
+      INFO(`Maintenance mode on, current pending deals: ${storageDealsMap.size}`);
+    } else {
+      INFO(`Maintenance mode off, current pending deals: ${storageDealsMap.size}`);
+    }
+  }, 30 * 1000);
+}, config.bot.startup_maintenance_delay * 3600 * 1000);
 
 function shutdown(exitCode = 0) {
   stop = true;
