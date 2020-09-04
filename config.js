@@ -11,6 +11,7 @@ module.exports = {
     max_daily_rate: process.env.MAX_DAILY_RATE || 125, //GB
     startup_delay: process.env.STARTUP_DELAY || 0, //hours
     proposal_window: process.env.PROPOSAL_WINDOW || 3600, //seconds
+    retrieval_window: process.env.RETRIEVAL_WINDOW || 3600, //seconds
     region: process.env.REGION || 'US-EAST', //bot region
     max_pending_retrieval_deals: process.env.MAX_PENDING_RETRIEVAL_DEALS || 200, 
     deal_epochs: process.env.DEAL_EPOCHS || 5760, //epochs for 48 hours

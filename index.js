@@ -533,12 +533,7 @@ async function StorageDeal(minerData, cmdMode = false) {
 }
 
 async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
-  INFO("RetrieveDeal [" + dataCid + "]");
-
-  pendingRetriveDealsMap.set(dataCid, {
-    miner: retrieveDeal.miner,
-    timestamp: Date.now()
-  });
+  INFO(`RetrieveDeal [${retrieveDeal.miner},${dataCid}]`);
 
   try {
     let outFile = RandomTestFilePath(config.bot.retrieve);
@@ -719,12 +714,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
 }
 
 async function RetrieveDealSync(dataCid, retrieveDeal, cmdMode = false) {
-  INFO("RetrieveDeal [" + dataCid + "]");
-
-  pendingRetriveDealsMap.set(dataCid, {
-    miner: retrieveDeal.miner,
-    timestamp: Date.now()
-  });
+  INFO(`RetrieveDealSync [${retrieveDeal.miner},${dataCid}]`);
 
   try {
     let outFile = RandomTestFilePath(config.bot.retrieve);
@@ -1068,6 +1058,22 @@ async function RunStorageDeals() {
   }
 }
 
+function ShouldRunRetrieval(miner) {
+  let result = true;
+  pendingRetriveDealsMap.forEach((value, key, map) => {
+    if (value.miner == miner) {
+      let timeDifferenceInSeconds = TimeDifferenceInSeconds(value.timestamp);
+      if (timeDifferenceInSeconds < config.bot.retrieval_window) {
+        result = false;
+      }
+
+      INFO(`PendingRetrieval[${value.miner}] dataCid: ${key}  pendingTime: ${timeDifferenceInSeconds} Seconds`);
+    }
+  });
+
+  return result;
+}
+
 async function RunRetriveDeals(serialRetrieve = false) {
   var it = 0;
   while (!stop && !maintenance && (it < cidsList.length)) {
@@ -1076,10 +1082,19 @@ async function RunRetriveDeals(serialRetrieve = false) {
       break;
     }
     if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
-      if (serialRetrieve) {
-        await RetrieveDealSync(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
-      } else {
-        await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+
+      if (ShouldRunRetrieval(cidsList[it].miner)) {
+        pendingRetriveDealsMap.set(cidsList[it].dataCid, {
+          miner: cidsList[it].miner,
+          timestamp: Date.now()
+        });
+
+        if (serialRetrieve) {
+          await RetrieveDealSync(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+        } else {
+          await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+        }
+
       }
     }
     await pause(1000);
