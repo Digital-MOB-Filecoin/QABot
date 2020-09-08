@@ -203,7 +203,9 @@ async function LoadRetrievalList() {
               dataCid: item.data_cid,
               miner: item.miner_id,
               size: item.file_size,
-              fileHash: item.hash
+              fileHash: item.hash,
+              dealCount: item.miner.deal_count_retrieve,
+              dealSuccessRate: item.miner.deal_success_rate_retrieve
             })
           }
         });
@@ -226,6 +228,17 @@ async function LoadRetrievalList() {
   if (count == 0) {
     return;
   }
+
+  tmpCidsList.sort((a, b) => {
+    if (a.dealCount < b.dealCount) {
+      return -1;
+    }
+    if (a.dealCount < b.dealCount) {
+      return 1;
+    }
+
+    return 0;
+  });
 
   const n = Math.ceil(tmpCidsList.length / config.bot.total);
   const index = config.bot.index;
@@ -533,7 +546,7 @@ async function StorageDeal(minerData, cmdMode = false) {
 }
 
 async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
-  INFO(`RetrieveDeal [${retrieveDeal.miner},${dataCid}]`);
+  INFO(`RetrieveDeal [${retrieveDeal.miner},${dataCid}] dealCount: ${retrieveDeal.dealCount} dealSuccessRate: ${retrieveDeal.dealSuccessRate}`);
 
   try {
     let outFile = RandomTestFilePath(config.bot.retrieve);
