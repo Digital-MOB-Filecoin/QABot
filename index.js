@@ -1088,31 +1088,44 @@ function ShouldRunRetrieval(miner) {
 }
 
 async function RunRetriveDeals(serialRetrieve = false) {
+  let minersPropsMap = new Map();
   var it = 0;
   while (!stop && !maintenance && (it < cidsList.length)) {
     if (pendingRetriveDealsMap.size >= MAX_PENDING_RETRIEVAL_DEALS) {
       INFO(`RunRetriveDeals pending retrieval deals limit reached MAX_PENDING_RETRIEVAL_DEALS(${MAX_PENDING_RETRIEVAL_DEALS})`);
       break;
     }
-    if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
+    if (!minersPropsMap.has(cidsList[it].miner)) {
+      if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
 
-      if (ShouldRunRetrieval(cidsList[it].miner)) {
-        pendingRetriveDealsMap.set(cidsList[it].dataCid, {
-          miner: cidsList[it].miner,
-          timestamp: Date.now()
-        });
+        if (ShouldRunRetrieval(cidsList[it].miner)) {
+          minersPropsMap.set(cidsList[it].miner, cidsList[it].dataCid);
 
-        if (serialRetrieve) {
-          await RetrieveDealSync(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
-        } else {
-          await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+          pendingRetriveDealsMap.set(cidsList[it].dataCid, {
+            miner: cidsList[it].miner,
+            timestamp: Date.now()
+          });
+
+          INFO (`RunRetriveDealsRun for miner[${cidsList[it].miner}] dataCid: ${minersPropsMap.get(cidsList[it].miner)}`);
+
+          if (serialRetrieve) {
+            await RetrieveDealSync(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+          } else {
+            await RetrieveDeal(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
+          }
+          await pause(1000);
+
         }
-
       }
-    }
-    await pause(1000);
+    } 
+
+    await pause(10);
     it++;
   }
+
+  INFO (`RunRetriveDealsRun proposed ${minersPropsMap.size} deals`);
+
+  minersPropsMap.clear();
 }
 
 async function StorageDealStatus(dealCid, pendingStorageDeal) {
@@ -1380,10 +1393,20 @@ const mainLoopRetrieve = async _ => {
       await pause(30 * 1000);
       continue;
     }
+
+    const startLoop = Date.now();
+
     await LoadRetrievalList();
     await RunRetriveDeals((config.bot.mode == 'serial-retrieve'));
-    await pause(120 * 1000); // 2 min
+
     PrintRetrievalStats();
+
+    const loopDuration = TimeDifferenceInSeconds(startLoop);
+    const sleepDuration =  (loopDuration < config.bot.proposal_window) ? (config.bot.proposal_window - loopDuration) : 30;
+
+    INFO(`loopDuration: ${loopDuration} Seconds sleepDuration: ${sleepDuration} Seconds`);
+
+    await pause(sleepDuration * 1000);
   }
 };
 

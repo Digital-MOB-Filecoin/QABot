@@ -1,6 +1,6 @@
 {
   "name": "qabot",
-  "version": "1.4.9",
+  "version": "1.5.0",
   "description": "QA Bot",
   "main": "index.js",
   "scripts": {
