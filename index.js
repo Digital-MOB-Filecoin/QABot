@@ -1423,10 +1423,19 @@ setTimeout(() => {
   INFO(`Start Maintenance mode check, after ${config.bot.startup_maintenance_delay} hours`);
   setInterval(async () => {
     maintenance = await backend.Maintenance();
-    if (maintenance) {
-      INFO(`Maintenance mode on, current pending deals: ${storageDealsMap.size}`);
+
+    let pendingDeals;
+
+    if (config.bot.mode == 'store') {
+      pendingDeals = storageDealsMap.size;
     } else {
-      INFO(`Maintenance mode off, current pending deals: ${storageDealsMap.size}`);
+      pendingDeals = pendingRetriveDealsMap.size;
+    }
+
+    if (maintenance) {
+      INFO(`Maintenance mode on, current pending deals: ${pendingDeals}`);
+    } else {
+      INFO(`Maintenance mode off, current pending deals: ${pendingDeals}`);
     }
   }, 30 * 1000);
 }, config.bot.startup_maintenance_delay * 3600 * 1000);
