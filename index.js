@@ -199,13 +199,23 @@ async function LoadRetrievalList() {
         response.data.items.forEach(item => {
           i++;
           if (item.data_cid && item.miner_id) {
+            const BigNumber = require('bignumber.js');
+            let successRate = new BigNumber(0.8);
+            let skipDeal = false;
+
+            if (item.miner.deal_success_rate_retrieve && (successRate.comparedTo(item.miner.deal_success_rate_retrieve) == -1)) {
+              INFO(`SkipRetrieveDeal [${item.miner_id},${item.data_cid}] dealCount: ${item.miner.deal_count_retrieve} dealSuccessRate: ${item.miner.deal_success_rate_retrieve}`);
+              skipDeal = true;
+            }
+
             tmpCidsList.push({
               dataCid: item.data_cid,
               miner: item.miner_id,
               size: item.file_size,
               fileHash: item.hash,
               dealCount: item.miner.deal_count_retrieve,
-              dealSuccessRate: item.miner.deal_success_rate_retrieve
+              dealSuccessRate: item.miner.deal_success_rate_retrieve,
+              skipDeal: skipDeal
             })
           }
         });
@@ -1095,7 +1105,7 @@ async function RunRetriveDeals(serialRetrieve = false) {
       INFO(`RunRetriveDeals pending retrieval deals limit reached MAX_PENDING_RETRIEVAL_DEALS(${MAX_PENDING_RETRIEVAL_DEALS})`);
       break;
     }
-    if (!minersPropsMap.has(cidsList[it].miner)) {
+    if (!minersPropsMap.has(cidsList[it].miner) && !cidsList[it].skipDeal) {
       if (!pendingRetriveDealsMap.has(cidsList[it].dataCid)) {
 
         if (ShouldRunRetrieval(cidsList[it].miner)) {
