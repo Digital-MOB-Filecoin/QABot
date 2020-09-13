@@ -202,10 +202,20 @@ async function LoadRetrievalList() {
             const BigNumber = require('bignumber.js');
             let successRate = new BigNumber(0.8);
             let skipDeal = false;
+            let dealCount = 0;
+            let dealSuccessRate = 0;
 
             if (item.miner.deal_success_rate_retrieve && (successRate.comparedTo(item.miner.deal_success_rate_retrieve) == -1)) {
               INFO(`SkipRetrieveDeal [${item.miner_id},${item.data_cid}] dealCount: ${item.miner.deal_count_retrieve} dealSuccessRate: ${item.miner.deal_success_rate_retrieve}`);
               skipDeal = true;
+            }
+
+            if (item.miner.deal_count_retrieve) {
+              dealCount = item.miner.deal_count_retrieve;
+            }
+
+            if (item.miner.deal_success_rate_retrieve) {
+              dealSuccessRate = item.miner.deal_success_rate_retrieve;
             }
 
             tmpCidsList.push({
@@ -213,8 +223,8 @@ async function LoadRetrievalList() {
               miner: item.miner_id,
               size: item.file_size,
               fileHash: item.hash,
-              dealCount: item.miner.deal_count_retrieve,
-              dealSuccessRate: item.miner.deal_success_rate_retrieve,
+              dealCount: dealCount,
+              dealSuccessRate: dealSuccessRate,
               skipDeal: skipDeal
             })
           }
@@ -1116,7 +1126,7 @@ async function RunRetriveDeals(serialRetrieve = false) {
             timestamp: Date.now()
           });
 
-          INFO (`RunRetriveDealsRun for miner[${cidsList[it].miner}] dataCid: ${minersPropsMap.get(cidsList[it].miner)}`);
+          INFO (`RunRetriveDealsRun for miner[${cidsList[it].miner}] dataCid: ${minersPropsMap.get(cidsList[it].miner)} dealCount: ${cidsList[it].dealCount} dealSuccessRate: ${cidsList[it].dealSuccessRate}`);
 
           if (serialRetrieve) {
             await RetrieveDealSync(cidsList[it].dataCid, cidsList[it], flags.cmdMode);
