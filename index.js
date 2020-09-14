@@ -222,7 +222,7 @@ async function LoadRetrievalList() {
               dataCid: item.data_cid,
               miner: item.miner_id,
               size: item.file_size,
-              fileHash: item.hash,
+              fileHash: 'n/a',
               dealCount: dealCount,
               dealSuccessRate: dealSuccessRate,
               skipDeal: skipDeal
@@ -697,11 +697,8 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
           statsRetrieveDealsFailed++;
           prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
         } else {
-          var hash = SHA256FileSync(outFile);
-          INFO("RetrieveDeal [" + dataCid + "] SHA256: " + hash);
-          if (hash == retrieveDeal.fileHash) {
             //PASSED -> send result to BE
-            PASSED('RetrieveDeal', retrieveDeal.miner, dataCid + ';success outFile:' + outFile + 'sha256:' + hash);
+            PASSED('RetrieveDeal', retrieveDeal.miner, dataCid + ';success outFile:' + outFile + 'sha256:' + retrieveDeal.fileHash);
             backend.SaveRetrieveDeal(
               retrieveDeal.miner,
               true,
@@ -717,27 +714,7 @@ async function RetrieveDeal(dataCid, retrieveDeal, cmdMode = false) {
 
             statsRetrieveDealsSuccessful++;
             prometheus.SetSuccessfulRetrieveDeals(statsRetrieveDealsSuccessful);
-          } else {
-            //FAILED -> send result to BE
-            FAILED('RetrieveDeal', retrieveDeal.miner, dataCid + ';hash check failed outFile:' + outFile + ' sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash);
-            backend.SaveRetrieveDeal(
-              retrieveDeal.miner,
-              false,
-              dataCid,
-              'n/a',
-              retrieveDeal.size,
-              retrieveDeal.fileHash,
-              'hash check failed sha256:' + hash + ' original sha256:' + retrieveDeal.fileHash,
-              Math.floor(retrievalTimestamp / 1000));
-
-            pendingRetriveDealsMap.delete(dataCid);
-            await backend.DeleteCid(dataCid)
-
-            statsRetrieveDealsFailed++;
-            prometheus.SetFailedRetrieveDeals(statsRetrieveDealsFailed);
-          }
         }
-
       });
     } 
   } catch (e) {
